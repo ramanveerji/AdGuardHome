@@ -420,7 +420,7 @@ func (d *DNSFilter) handleCheckHost(w http.ResponseWriter, r *http.Request) {
 	setts.FilteringEnabled = true
 	setts.ProtectionEnabled = true
 
-	d.ApplyBlockedServices(&setts, nil)
+	d.ApplyBlockedServices(&setts)
 	result, err := d.CheckHost(host, dns.TypeA, &setts)
 	if err != nil {
 		aghhttp.Error(

@@ -105,7 +105,7 @@ type Config struct {
 
 	// Names of services to block (globally).
 	// Per-client settings can override this configuration.
-	BlockedServices []string `yaml:"blocked_services"`
+	BlockedServices *BlockedServices `yaml:"blocked_services"`
 
 	// EtcHosts is a container of IP-hostname pairs taken from the operating
 	// system configuration files (e.g. /etc/hosts).
@@ -987,16 +987,18 @@ func New(c *Config, blockFilters []Filter) (d *DNSFilter, err error) {
 		return nil, fmt.Errorf("rewrites: preparing: %s", err)
 	}
 
-	bsvcs := []string{}
-	for _, s := range d.BlockedServices {
-		if !BlockedSvcKnown(s) {
-			log.Debug("skipping unknown blocked-service %q", s)
+	if d.BlockedServices != nil {
+		bsvcs := []string{}
+		for _, s := range d.BlockedServices.Services {
+			if !BlockedSvcKnown(s) {
+				log.Debug("skipping unknown blocked-service %q", s)
 
-			continue
+				continue
+			}
+			bsvcs = append(bsvcs, s)
 		}
-		bsvcs = append(bsvcs, s)
+		d.BlockedServices.Services = bsvcs
 	}
-	d.BlockedServices = bsvcs
 
 	if blockFilters != nil {
 		err = d.initFiltering(nil, blockFilters)
