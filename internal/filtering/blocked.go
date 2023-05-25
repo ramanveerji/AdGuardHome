@@ -90,23 +90,50 @@ func (r dayRange) validate() (err error) {
 	}
 }
 
+// blockedServicesConfig is the configuration for blocked services.
 type blockedServicesConfig struct {
-	TimeZone string   `yaml:"time_zone"`
-	Services []string `yaml:"services"`
+	// IDs is the names of blocked services.
+	IDs []string `yaml:"ids"`
 
-	Sunday    *[2]timeutil.Duration `yaml:"sunday"`
-	Monday    *[2]timeutil.Duration `yaml:"monday"`
-	Tuesday   *[2]timeutil.Duration `yaml:"tuesday"`
-	Wednesday *[2]timeutil.Duration `yaml:"wednesday"`
-	Thursday  *[2]timeutil.Duration `yaml:"thursday"`
-	Friday    *[2]timeutil.Duration `yaml:"friday"`
-	Saturday  *[2]timeutil.Duration `yaml:"saturday"`
+	// Schedule is blocked services schedule for every day of the week.
+	Schedule blockedSchedule `yaml:"schedule"`
 }
 
+// blockedSchedule is the schedule for blocked services.
+type blockedSchedule struct {
+	// TimeZone is the local time zone.
+	TimeZone string `yaml:"time_zone"`
+
+	// Days of the week.
+
+	Sunday    *day `yaml:"sunday"`
+	Monday    *day `yaml:"monday"`
+	Tuesday   *day `yaml:"tuesday"`
+	Wednesday *day `yaml:"wednesday"`
+	Thursday  *day `yaml:"thursday"`
+	Friday    *day `yaml:"friday"`
+	Saturday  *day `yaml:"saturday"`
+}
+
+// day is a range within a single day.
+type day struct {
+	// Start is the duration from the the start of the day.
+	Start timeutil.Duration `yaml:"start"`
+
+	// End is the duration from the the start of the day.
+	End timeutil.Duration `yaml:"end"`
+}
+
+// BlockedServices is the internal structure for blocked services.
 type BlockedServices struct {
-	Week     [7]dayRange
+	// Week is blocked services schedule for every day of the week.
+	Week [7]dayRange
+
+	// Location contins local time zone.
 	Location *time.Location
-	Services []string
+
+	// IDs is the names of blocked services.
+	IDs []string
 }
 
 func (s *BlockedServices) UnmarshalYAML(unmarshal func(any) error) (err error) {
@@ -117,22 +144,23 @@ func (s *BlockedServices) UnmarshalYAML(unmarshal func(any) error) (err error) {
 		return err
 	}
 
-	bs := &BlockedServices{}
-	bs.Services = conf.Services
+	bs := BlockedServices{
+		IDs: conf.IDs,
+	}
 
-	bs.Location, err = time.LoadLocation(conf.TimeZone)
+	bs.Location, err = time.LoadLocation(conf.Schedule.TimeZone)
 	if err != nil {
 		return err
 	}
 
-	days := []*[2]timeutil.Duration{
-		conf.Sunday,
-		conf.Monday,
-		conf.Tuesday,
-		conf.Wednesday,
-		conf.Thursday,
-		conf.Friday,
-		conf.Saturday,
+	days := []*day{
+		conf.Schedule.Sunday,
+		conf.Schedule.Monday,
+		conf.Schedule.Tuesday,
+		conf.Schedule.Wednesday,
+		conf.Schedule.Thursday,
+		conf.Schedule.Friday,
+		conf.Schedule.Saturday,
 	}
 	for i, d := range days {
 		if d == nil {
@@ -142,8 +170,8 @@ func (s *BlockedServices) UnmarshalYAML(unmarshal func(any) error) (err error) {
 		}
 
 		bs.Week[i] = dayRange{
-			start: uint16(d[0].Minutes()),
-			end:   uint16(d[1].Minutes()),
+			start: uint16(d.Start.Minutes()),
+			end:   uint16(d.End.Minutes()),
 		}
 	}
 
@@ -154,43 +182,47 @@ func (s *BlockedServices) UnmarshalYAML(unmarshal func(any) error) (err error) {
 		}
 	}
 
-	*s = *bs
+	*s = bs
 
 	return nil
 }
 
 func (s *BlockedServices) MarshalYAML() (v any, err error) {
-	conf := blockedServicesConfig{
+	schedule := blockedSchedule{
 		TimeZone: s.Location.String(),
-		Services: s.Services,
-		Sunday: &[2]timeutil.Duration{
-			{Duration: time.Minute * time.Duration(s.Week[0].start)},
-			{Duration: time.Minute * time.Duration(s.Week[0].end)},
+		Sunday: &day{
+			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[0].start)},
+			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[0].end)},
 		},
-		Monday: &[2]timeutil.Duration{
-			{Duration: time.Minute * time.Duration(s.Week[1].start)},
-			{Duration: time.Minute * time.Duration(s.Week[1].end)},
+		Monday: &day{
+			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[1].start)},
+			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[1].end)},
 		},
-		Tuesday: &[2]timeutil.Duration{
-			{Duration: time.Minute * time.Duration(s.Week[2].start)},
-			{Duration: time.Minute * time.Duration(s.Week[2].end)},
+		Tuesday: &day{
+			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[2].start)},
+			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[2].end)},
 		},
-		Wednesday: &[2]timeutil.Duration{
-			{Duration: time.Minute * time.Duration(s.Week[3].start)},
-			{Duration: time.Minute * time.Duration(s.Week[3].end)},
+		Wednesday: &day{
+			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[3].start)},
+			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[3].end)},
 		},
-		Thursday: &[2]timeutil.Duration{
-			{Duration: time.Minute * time.Duration(s.Week[4].start)},
-			{Duration: time.Minute * time.Duration(s.Week[4].end)},
+		Thursday: &day{
+			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[4].start)},
+			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[4].end)},
 		},
-		Friday: &[2]timeutil.Duration{
-			{Duration: time.Minute * time.Duration(s.Week[5].start)},
-			{Duration: time.Minute * time.Duration(s.Week[5].end)},
+		Friday: &day{
+			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[5].start)},
+			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[5].end)},
 		},
-		Saturday: &[2]timeutil.Duration{
-			{Duration: time.Minute * time.Duration(s.Week[6].start)},
-			{Duration: time.Minute * time.Duration(s.Week[6].end)},
+		Saturday: &day{
+			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[6].start)},
+			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[6].end)},
 		},
+	}
+
+	conf := blockedServicesConfig{
+		IDs:      s.IDs,
+		Schedule: schedule,
 	}
 
 	return conf, nil
@@ -231,7 +263,7 @@ func (d *DNSFilter) ApplyBlockedServices(setts *Settings) {
 		return
 	}
 
-	d.ApplyBlockedServicesList(setts, bsvc.Services)
+	d.ApplyBlockedServicesList(setts, bsvc.IDs)
 }
 
 func (d *DNSFilter) ApplyBlockedServicesList(setts *Settings, list []string) {
@@ -280,7 +312,7 @@ func (d *DNSFilter) handleBlockedServicesSet(w http.ResponseWriter, r *http.Requ
 	}
 
 	d.confLock.Lock()
-	d.Config.BlockedServices.Services = list
+	d.Config.BlockedServices.IDs = list
 	d.confLock.Unlock()
 
 	log.Debug("Updated blocked services list: %d", len(list))

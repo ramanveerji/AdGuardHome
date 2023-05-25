@@ -1164,8 +1164,10 @@ func TestUpgradeSchema20to21(t *testing.T) {
 		want: yobj{
 			"dns": yobj{
 				"blocked_services": yobj{
-					"services":  yarr{"ok"},
-					"time_zone": "Local",
+					"ids": yarr{"ok"},
+					"schedule": yobj{
+						"time_zone": "Local",
+					},
 				},
 			},
 			"schema_version": newSchemaVer,

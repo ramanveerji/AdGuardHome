@@ -1139,9 +1139,10 @@ func upgradeSchema19to20(diskConf yobj) (err error) {
 //	# AFTER:
 //	'dns':
 //	  'blocked_services':
-//	    'services':
+//	    'ids':
 //	    - 'svc_name'
-//	    'time_zone': "Local"
+//	    'schedule':
+//	      'time_zone': "Local"
 func upgradeSchema20to21(diskConf yobj) (err error) {
 	log.Printf("Upgrade yaml: 20 to 21")
 	diskConf["schema_version"] = 21
@@ -1169,8 +1170,10 @@ func upgradeSchema20to21(diskConf yobj) (err error) {
 	}
 
 	dns[field] = yobj{
-		"services":  services,
-		"time_zone": "Local",
+		"ids": services,
+		"schedule": yobj{
+			"time_zone": "Local",
+		},
 	}
 
 	return nil

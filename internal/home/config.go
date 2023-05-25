@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/AdguardTeam/AdGuardHome/internal/aghalg"
 	"github.com/AdguardTeam/AdGuardHome/internal/aghtls"
@@ -315,6 +316,10 @@ var config = &configuration{
 				Pixabay:    true,
 				Yandex:     true,
 				YouTube:    true,
+			},
+
+			BlockedServices: &filtering.BlockedServices{
+				Location: time.Local,
 			},
 		},
 		UpstreamTimeout: timeutil.Duration{Duration: dnsforward.DefaultTimeout},
