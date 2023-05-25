@@ -106,22 +106,20 @@ type blockedSchedule struct {
 
 	// Days of the week.
 
-	Sunday    *day `yaml:"sunday"`
-	Monday    *day `yaml:"monday"`
-	Tuesday   *day `yaml:"tuesday"`
-	Wednesday *day `yaml:"wednesday"`
-	Thursday  *day `yaml:"thursday"`
-	Friday    *day `yaml:"friday"`
-	Saturday  *day `yaml:"saturday"`
+	Sunday    *day `yaml:"sun"`
+	Monday    *day `yaml:"mon"`
+	Tuesday   *day `yaml:"tue"`
+	Wednesday *day `yaml:"wed"`
+	Thursday  *day `yaml:"thu"`
+	Friday    *day `yaml:"fri"`
+	Saturday  *day `yaml:"sat"`
 }
 
-// day is a range within a single day.
+// day is a range within a single day.  Start and End are durations from the
+// start of day, with 0s being (0 minutes) and 23h59m (1439 minutes).
 type day struct {
-	// Start is the duration from the the start of the day.
 	Start timeutil.Duration `yaml:"start"`
-
-	// End is the duration from the the start of the day.
-	End timeutil.Duration `yaml:"end"`
+	End   timeutil.Duration `yaml:"end"`
 }
 
 // BlockedServices is the internal structure for blocked services.

@@ -25,8 +25,59 @@ NOTE: Add new changes BELOW THIS COMMENT.
 
 ### Added
 
+- The ability to set custom schedule for blocked services in the configuration
+  file ([#951]).
 - The ability to edit rewrite rules via `PUT /control/rewrite/update` HTTP API
   ([#1577]).
+
+### Changed
+
+#### Configuration Changes
+
+In this release, the schema version has changed from 20 to 21.
+
+- Property `dns.blocked_services`, which in schema versions 20 and earlier used
+  to be a list containing ids of blocked services, is now a object containing
+  ids and schedule for blocked services:
+
+  ```yaml
+  # BEFORE:
+  'blocked_services':
+  - id_1
+  - id_2
+
+  # AFTER:
+  'blocked_services':
+    'ids':
+    - id_1
+    - id_2
+    'schedule':
+      'time_zone': 'Local'
+      'sun': ''
+        'start': '0s'
+        'end': '0s'
+      'mon': ''
+        'start': '0s'
+        'end': '0s'
+      'tue': ''
+        'start': '0s'
+        'end': '0s'
+      'wed': ''
+        'start': '0s'
+        'end': '0s'
+      'thu': ''
+        'start': '0s'
+        'end': '0s'
+      'fri': ''
+        'start': '0s'
+        'end': '0s'
+      'sat': ''
+        'start': '0s'
+        'end': '0s'
+  ```
+
+  To rollback this change, replace `dns.blocked_services` object with the list
+  of ids of blocked services and change the `schema_version` back to `20`.
 
 ### Fixed
 
@@ -40,6 +91,7 @@ NOTE: Add new changes BELOW THIS COMMENT.
 - Provided bootstrap servers are now used to resolve the hostnames of plain
   UDP/TCP upstream servers.
 
+[#951]: https://github.com/AdguardTeam/AdGuardHome/issues/951
 [#1577]: https://github.com/AdguardTeam/AdGuardHome/issues/1577
 [#5716]: https://github.com/AdguardTeam/AdGuardHome/issues/5716
 

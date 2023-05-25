@@ -1142,7 +1142,7 @@ func upgradeSchema19to20(diskConf yobj) (err error) {
 //	    'ids':
 //	    - 'svc_name'
 //	    'schedule':
-//	      'time_zone': "Local"
+//	      'time_zone': 'Local'
 func upgradeSchema20to21(diskConf yobj) (err error) {
 	log.Printf("Upgrade yaml: 20 to 21")
 	diskConf["schema_version"] = 21
