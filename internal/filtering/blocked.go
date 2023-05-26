@@ -12,6 +12,7 @@ import (
 	"github.com/AdguardTeam/golibs/timeutil"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"golang.org/x/exp/slices"
+	"gopkg.in/yaml.v3"
 )
 
 // serviceRules maps a service ID to its filtering rules.
@@ -140,10 +141,12 @@ type BlockedServices struct {
 	IDs []string
 }
 
-func (s *BlockedServices) UnmarshalYAML(unmarshal func(any) error) (err error) {
+// UnmarshalYAML implements the [yaml.Unmarshaler] interface for
+// *BlockedServices.
+func (s *BlockedServices) UnmarshalYAML(value *yaml.Node) (err error) {
 	conf := &blockedServicesConfig{}
 
-	err = unmarshal(conf)
+	err = value.Decode(conf)
 	if err != nil {
 		return err
 	}
@@ -191,6 +194,7 @@ func (s *BlockedServices) UnmarshalYAML(unmarshal func(any) error) (err error) {
 	return nil
 }
 
+// MarshalYAML implements the [yaml.Marshaler] interface for *BlockedServices.
 func (s *BlockedServices) MarshalYAML() (v any, err error) {
 	schedule := blockedSchedule{
 		TimeZone: s.Location.String(),
