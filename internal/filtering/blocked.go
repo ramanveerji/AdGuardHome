@@ -51,13 +51,13 @@ func initBlockedServices() {
 // dayRange is a range within a single day.  Start and End are minutes from the
 // start of day, with 0 being 00:00:00.(0) and 1439, 23:59:59.(9).
 type dayRange struct {
-	start uint16
-	end   uint16
+	start time.Duration
+	end   time.Duration
 }
 
 // maxDayRangeMinutes is the maximum value for DayRange.Start and DayRange.End
 // fields, excluding the zero-length range ones.
-const maxDayRangeMinutes = 24*60 - 1
+const maxDayRangeMinutes = 24*time.Hour - 1*time.Minute
 
 // zeroLengthRange returns a new zero-length day range.
 func zeroLengthRange() (r dayRange) {
@@ -76,15 +76,21 @@ func (r dayRange) isZeroLength() (ok bool) {
 func (r dayRange) validate() (err error) {
 	defer func() { err = errors.Annotate(err, "bad day range: %w") }()
 
+	if d := r.start.Truncate(time.Minute); d != r.start {
+		return fmt.Errorf("start: round to minutes %v", r.start)
+	} else if d = r.end.Truncate(time.Minute); d != r.end {
+		return fmt.Errorf("end: round to minutes %v", r.end)
+	}
+
 	switch {
 	case r.isZeroLength():
 		return nil
 	case r.end < r.start:
-		return fmt.Errorf("end %d less than start %d", r.end, r.start)
+		return fmt.Errorf("end %v less than start %v", r.end, r.start)
 	case r.start > maxDayRangeMinutes:
-		return fmt.Errorf("start %d greater than %d", r.start, maxDayRangeMinutes)
+		return fmt.Errorf("start %v greater than %v", r.start, maxDayRangeMinutes)
 	case r.end > maxDayRangeMinutes:
-		return fmt.Errorf("end %d greater than %d", r.end, maxDayRangeMinutes)
+		return fmt.Errorf("end %v greater than %v", r.end, maxDayRangeMinutes)
 	default:
 		return nil
 	}
@@ -127,7 +133,7 @@ type BlockedServices struct {
 	// Week is blocked services schedule for every day of the week.
 	Week [7]dayRange
 
-	// Location contins local time zone.
+	// Location contains the local time zone.
 	Location *time.Location
 
 	// IDs is the names of blocked services.
@@ -167,17 +173,17 @@ func (s *BlockedServices) UnmarshalYAML(unmarshal func(any) error) (err error) {
 			continue
 		}
 
-		bs.Week[i] = dayRange{
-			start: uint16(d.Start.Minutes()),
-			end:   uint16(d.End.Minutes()),
+		r := dayRange{
+			start: d.Start.Duration,
+			end:   d.End.Duration,
 		}
-	}
 
-	for i, r := range bs.Week {
 		err = r.validate()
 		if err != nil {
 			return fmt.Errorf("weekday %s: %w", time.Weekday(i), err)
 		}
+
+		bs.Week[i] = r
 	}
 
 	*s = bs
@@ -189,32 +195,32 @@ func (s *BlockedServices) MarshalYAML() (v any, err error) {
 	schedule := blockedSchedule{
 		TimeZone: s.Location.String(),
 		Sunday: &day{
-			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[0].start)},
-			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[0].end)},
+			Start: timeutil.Duration{Duration: s.Week[0].start},
+			End:   timeutil.Duration{Duration: s.Week[0].end},
 		},
 		Monday: &day{
-			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[1].start)},
-			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[1].end)},
+			Start: timeutil.Duration{Duration: s.Week[1].start},
+			End:   timeutil.Duration{Duration: s.Week[1].end},
 		},
 		Tuesday: &day{
-			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[2].start)},
-			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[2].end)},
+			Start: timeutil.Duration{Duration: s.Week[2].start},
+			End:   timeutil.Duration{Duration: s.Week[2].end},
 		},
 		Wednesday: &day{
-			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[3].start)},
-			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[3].end)},
+			Start: timeutil.Duration{Duration: s.Week[3].start},
+			End:   timeutil.Duration{Duration: s.Week[3].end},
 		},
 		Thursday: &day{
-			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[4].start)},
-			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[4].end)},
+			Start: timeutil.Duration{Duration: s.Week[4].start},
+			End:   timeutil.Duration{Duration: s.Week[4].end},
 		},
 		Friday: &day{
-			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[5].start)},
-			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[5].end)},
+			Start: timeutil.Duration{Duration: s.Week[5].start},
+			End:   timeutil.Duration{Duration: s.Week[5].end},
 		},
 		Saturday: &day{
-			Start: timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[6].start)},
-			End:   timeutil.Duration{Duration: time.Minute * time.Duration(s.Week[6].end)},
+			Start: timeutil.Duration{Duration: s.Week[6].start},
+			End:   timeutil.Duration{Duration: s.Week[6].end},
 		},
 	}
 
@@ -235,8 +241,8 @@ func (s *BlockedServices) Contains(t time.Time) (ok bool) {
 	}
 
 	day := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, s.Location)
-	start := day.Add(time.Duration(r.start) * time.Minute)
-	end := day.Add(time.Duration(r.end+1)*time.Minute - 1*time.Nanosecond)
+	start := day.Add(r.start)
+	end := day.Add(r.end + 1*time.Minute - 1*time.Nanosecond)
 
 	return !t.Before(start) && !t.After(end)
 }
@@ -294,7 +300,7 @@ func (d *DNSFilter) handleBlockedServicesAll(w http.ResponseWriter, r *http.Requ
 
 func (d *DNSFilter) handleBlockedServicesList(w http.ResponseWriter, r *http.Request) {
 	d.confLock.RLock()
-	list := d.Config.BlockedServices
+	list := d.Config.BlockedServices.IDs
 	d.confLock.RUnlock()
 
 	_ = aghhttp.WriteJSONResponse(w, r, list)

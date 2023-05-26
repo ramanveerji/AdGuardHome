@@ -37,7 +37,7 @@ NOTE: Add new changes BELOW THIS COMMENT.
 In this release, the schema version has changed from 20 to 21.
 
 - Property `dns.blocked_services`, which in schema versions 20 and earlier used
-  to be a list containing ids of blocked services, is now a object containing
+  to be a list containing ids of blocked services, is now an object containing
   ids and schedule for blocked services:
 
   ```yaml
