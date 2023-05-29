@@ -98,20 +98,8 @@ func (r dayRange) validate() (err error) {
 	}
 }
 
-// blockedServicesConfig is the configuration for blocked services.
-type blockedServicesConfig struct {
-	// IDs is the names of blocked services.
-	IDs []string `yaml:"ids"`
-
-	// Schedule is blocked services schedule for every day of the week.
-	Schedule blockedSchedule `yaml:"schedule"`
-}
-
-// blockedSchedule is the schedule for blocked services.
-type blockedSchedule struct {
-	// TimeZone is the local time zone.
-	TimeZone string `yaml:"time_zone"`
-
+// blockedScheduleConfig is the configuration of blocked schedule.
+type blockedScheduleConfig struct {
 	// Days of the week.
 
 	Sunday    *day `yaml:"sun"`
@@ -121,6 +109,9 @@ type blockedSchedule struct {
 	Thursday  *day `yaml:"thu"`
 	Friday    *day `yaml:"fri"`
 	Saturday  *day `yaml:"sat"`
+
+	// TimeZone is the local time zone.
+	TimeZone string `yaml:"time_zone"`
 }
 
 // day is a range within a single day.  Start and End are durations from the
@@ -130,45 +121,51 @@ type day struct {
 	End   timeutil.Duration `yaml:"end"`
 }
 
-// BlockedServices is the internal structure for blocked services.
+// BlockedServices is the configuration of blocked services.
 type BlockedServices struct {
-	// Week is blocked services schedule for every day of the week.
-	Week [7]dayRange
+	// Schedule is blocked services schedule for every day of the week.
+	Schedule *BlockedSchedule
 
+	// IDs is the names of blocked services.
+	IDs []string `yaml:"ids"`
+}
+
+// BlockedSchedule is the internal structure of blocked schedule.
+type BlockedSchedule struct {
 	// Location contains the local time zone.
 	Location *time.Location
 
-	// IDs is the names of blocked services.
-	IDs []string
+	// Week is blocked services schedule for every day of the week.
+	Week [7]dayRange
 }
 
 // UnmarshalYAML implements the [yaml.Unmarshaler] interface for
 // *BlockedServices.
-func (s *BlockedServices) UnmarshalYAML(value *yaml.Node) (err error) {
-	conf := &blockedServicesConfig{}
+func (s *BlockedSchedule) UnmarshalYAML(value *yaml.Node) (err error) {
+	conf := &blockedScheduleConfig{}
 
 	err = value.Decode(conf)
 	if err != nil {
+		// Don't wrap the error since it's informative enough as is.
 		return err
 	}
 
-	bs := BlockedServices{
-		IDs: conf.IDs,
-	}
+	bs := BlockedSchedule{}
 
-	bs.Location, err = time.LoadLocation(conf.Schedule.TimeZone)
+	bs.Location, err = time.LoadLocation(conf.TimeZone)
 	if err != nil {
+		// Don't wrap the error since it's informative enough as is.
 		return err
 	}
 
 	days := []*day{
-		conf.Schedule.Sunday,
-		conf.Schedule.Monday,
-		conf.Schedule.Tuesday,
-		conf.Schedule.Wednesday,
-		conf.Schedule.Thursday,
-		conf.Schedule.Friday,
-		conf.Schedule.Saturday,
+		conf.Sunday,
+		conf.Monday,
+		conf.Tuesday,
+		conf.Wednesday,
+		conf.Thursday,
+		conf.Friday,
+		conf.Saturday,
 	}
 	for i, d := range days {
 		if d == nil {
@@ -196,8 +193,8 @@ func (s *BlockedServices) UnmarshalYAML(value *yaml.Node) (err error) {
 }
 
 // MarshalYAML implements the [yaml.Marshaler] interface for *BlockedServices.
-func (s *BlockedServices) MarshalYAML() (v any, err error) {
-	schedule := blockedSchedule{
+func (s *BlockedSchedule) MarshalYAML() (v any, err error) {
+	return blockedScheduleConfig{
 		TimeZone: s.Location.String(),
 		Sunday: &day{
 			Start: timeutil.Duration{Duration: s.Week[0].start},
@@ -227,18 +224,11 @@ func (s *BlockedServices) MarshalYAML() (v any, err error) {
 			Start: timeutil.Duration{Duration: s.Week[6].start},
 			End:   timeutil.Duration{Duration: s.Week[6].end},
 		},
-	}
-
-	conf := blockedServicesConfig{
-		IDs:      s.IDs,
-		Schedule: schedule,
-	}
-
-	return conf, nil
+	}, nil
 }
 
 // Contains returns true if t is within the allowed schedule.
-func (s *BlockedServices) Contains(t time.Time) (ok bool) {
+func (s *BlockedSchedule) Contains(t time.Time) (ok bool) {
 	t = t.In(s.Location)
 	r := s.Week[int(t.Weekday())]
 	if r.isZeroLength() {
@@ -266,7 +256,7 @@ func (d *DNSFilter) ApplyBlockedServices(setts *Settings) {
 
 	bsvc := d.BlockedServices
 
-	if !bsvc.Contains(time.Now()) {
+	if !bsvc.Schedule.Contains(time.Now()) {
 		return
 	}
 

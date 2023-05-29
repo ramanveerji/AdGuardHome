@@ -319,7 +319,9 @@ var config = &configuration{
 			},
 
 			BlockedServices: &filtering.BlockedServices{
-				Location: time.Local,
+				Schedule: &filtering.BlockedSchedule{
+					Location: time.Local,
+				},
 			},
 		},
 		UpstreamTimeout: timeutil.Duration{Duration: dnsforward.DefaultTimeout},

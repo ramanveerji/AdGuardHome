@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBlockedServices_Contains(t *testing.T) {
+func TestBlockedSchedule_Contains(t *testing.T) {
 	baseTime := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 	otherTime := baseTime.Add(1 * timeutil.Day)
 
@@ -17,7 +17,7 @@ func TestBlockedServices_Contains(t *testing.T) {
 	otherTZ := time.FixedZone("Etc/GMT-3", 3*60*60)
 
 	// baseSchedule, 12:00:00 to 13:59:59.
-	baseSchedule := &BlockedServices{
+	baseSchedule := &BlockedSchedule{
 		Week: [7]dayRange{
 			zeroLengthRange(),
 			zeroLengthRange(),
@@ -32,7 +32,7 @@ func TestBlockedServices_Contains(t *testing.T) {
 	}
 
 	// allDaySchedule, 00:00:00 to 23:59:59.
-	allDaySchedule := &BlockedServices{
+	allDaySchedule := &BlockedSchedule{
 		Week: [7]dayRange{
 			zeroLengthRange(),
 			zeroLengthRange(),
@@ -47,7 +47,7 @@ func TestBlockedServices_Contains(t *testing.T) {
 	}
 
 	testCases := []struct {
-		schedule *BlockedServices
+		schedule *BlockedSchedule
 		assert   assert.BoolAssertionFunc
 		t        time.Time
 		name     string
