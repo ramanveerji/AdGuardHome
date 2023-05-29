@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestParentalProtectionSchedule_Contains(t *testing.T) {
+func TestBlockedServices_Contains(t *testing.T) {
 	baseTime := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 	otherTime := baseTime.Add(1 * timeutil.Day)
 

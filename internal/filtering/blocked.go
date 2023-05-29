@@ -56,7 +56,7 @@ type dayRange struct {
 	end   time.Duration
 }
 
-// maxDayRangeMinutes is the maximum value for DayRange.Start and DayRange.End
+// maxDayRangeMinutes is the maximum value for dayRange.Start and dayRange.End
 // fields, excluding the zero-length range ones.
 const maxDayRangeMinutes = 24*time.Hour - 1*time.Minute
 
@@ -77,15 +77,16 @@ func (r dayRange) isZeroLength() (ok bool) {
 func (r dayRange) validate() (err error) {
 	defer func() { err = errors.Annotate(err, "bad day range: %w") }()
 
-	if d := r.start.Truncate(time.Minute); d != r.start {
-		return fmt.Errorf("start: round to minutes %v", r.start)
-	} else if d = r.end.Truncate(time.Minute); d != r.end {
-		return fmt.Errorf("end: round to minutes %v", r.end)
-	}
+	start := r.start.Truncate(time.Minute)
+	end := r.end.Truncate(time.Minute)
 
 	switch {
 	case r.isZeroLength():
 		return nil
+	case start != r.start:
+		return fmt.Errorf("start: round to minutes %v", r.start)
+	case end != r.end:
+		return fmt.Errorf("end: round to minutes %v", r.end)
 	case r.end < r.start:
 		return fmt.Errorf("end %v less than start %v", r.end, r.start)
 	case r.start > maxDayRangeMinutes:
@@ -244,11 +245,9 @@ func (s *BlockedServices) Contains(t time.Time) (ok bool) {
 		return false
 	}
 
-	day := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, s.Location)
-	start := day.Add(r.start)
-	end := day.Add(r.end + 1*time.Minute - 1*time.Nanosecond)
+	mins := time.Duration(60*t.Hour()+t.Minute()) * time.Minute
 
-	return !t.Before(start) && !t.After(end)
+	return mins >= r.start && mins <= r.end
 }
 
 // BlockedSvcKnown returns true if a blocked service ID is known.
