@@ -84,15 +84,15 @@ func (r dayRange) validate() (err error) {
 	case r.isZeroLength():
 		return nil
 	case start != r.start:
-		return fmt.Errorf("start: round to minutes %v", r.start)
+		return fmt.Errorf("start %s isn't rounded to minutes", r.start)
 	case end != r.end:
-		return fmt.Errorf("end: round to minutes %v", r.end)
+		return fmt.Errorf("end %s isn't rounded to minutes", r.end)
 	case r.end < r.start:
-		return fmt.Errorf("end %v less than start %v", r.end, r.start)
+		return fmt.Errorf("end %s less than start %s", r.end, r.start)
 	case r.start > maxDayRangeMinutes:
-		return fmt.Errorf("start %v greater than %v", r.start, maxDayRangeMinutes)
+		return fmt.Errorf("start %s greater than %s", r.start, maxDayRangeMinutes)
 	case r.end > maxDayRangeMinutes:
-		return fmt.Errorf("end %v greater than %v", r.end, maxDayRangeMinutes)
+		return fmt.Errorf("end %s greater than %s", r.end, maxDayRangeMinutes)
 	default:
 		return nil
 	}
