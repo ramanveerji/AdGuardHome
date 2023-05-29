@@ -139,6 +139,9 @@ type BlockedSchedule struct {
 	Week [7]dayRange
 }
 
+// type check
+var _ yaml.Unmarshaler = (*BlockedSchedule)(nil)
+
 // UnmarshalYAML implements the [yaml.Unmarshaler] interface for
 // *BlockedServices.
 func (s *BlockedSchedule) UnmarshalYAML(value *yaml.Node) (err error) {
@@ -191,6 +194,9 @@ func (s *BlockedSchedule) UnmarshalYAML(value *yaml.Node) (err error) {
 
 	return nil
 }
+
+// type check
+var _ yaml.Marshaler = (*BlockedSchedule)(nil)
 
 // MarshalYAML implements the [yaml.Marshaler] interface for *BlockedServices.
 func (s *BlockedSchedule) MarshalYAML() (v any, err error) {
