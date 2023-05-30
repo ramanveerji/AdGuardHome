@@ -17,6 +17,7 @@ import (
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering"
 	"github.com/AdguardTeam/AdGuardHome/internal/querylog"
 	"github.com/AdguardTeam/AdGuardHome/internal/stats"
+	"github.com/AdguardTeam/AdGuardHome/internal/whois"
 	"github.com/AdguardTeam/dnsproxy/proxy"
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/log"
@@ -170,7 +171,13 @@ func initDNSServer(
 	}
 
 	if config.Clients.Sources.WHOIS {
-		Context.whois = initWHOIS(&Context.clients)
+		w, loop := whois.InitWHOIS(customDialContext)
+		Context.whois = w
+
+		go loop(func(ip netip.Addr, info *whois.RuntimeClientWHOISInfo) {
+			wi := (*RuntimeClientWHOISInfo)(info)
+			Context.clients.setWHOISInfo(ip, wi)
+		})
 	}
 
 	return nil
@@ -219,7 +226,7 @@ func onDNSRequest(pctx *proxy.DNSContext) {
 	}
 
 	if srcs.WHOIS && !netutil.IsSpecialPurposeAddr(ip) {
-		Context.whois.Begin(ip)
+		Context.whois.Ch <- ip
 	}
 }
 
@@ -464,7 +471,7 @@ func startDNSServer() error {
 		}
 
 		if srcs.WHOIS && !netutil.IsSpecialPurposeAddr(ip) {
-			Context.whois.Begin(ip)
+			Context.whois.Ch <- ip
 		}
 	}
 

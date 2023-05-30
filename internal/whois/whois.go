@@ -1,8 +1,8 @@
-package home
+// Package whois provides WHOIS functionality.
+package whois
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -24,10 +24,11 @@ const (
 	whoisTTL       = 1 * 60 * 60 // 1 hour
 )
 
+type callback func(netip.Addr, *RuntimeClientWHOISInfo)
+
 // WHOIS - module context
 type WHOIS struct {
-	clients *clientsContainer
-	ipChan  chan netip.Addr
+	Ch chan netip.Addr
 
 	// dialContext specifies the dial function for creating unencrypted TCP
 	// connections.
@@ -42,22 +43,30 @@ type WHOIS struct {
 	timeoutMsec uint
 }
 
-// initWHOIS creates the WHOIS module context.
-func initWHOIS(clients *clientsContainer) *WHOIS {
+// InitWHOIS creates the WHOIS module context.
+func InitWHOIS(customDialContext func(context.Context, string, string) (net.Conn, error)) (*WHOIS, func(callback)) {
 	w := WHOIS{
 		timeoutMsec: 5000,
-		clients:     clients,
 		ipAddrs: cache.New(cache.Config{
 			EnableLRU: true,
 			MaxCount:  10000,
 		}),
 		dialContext: customDialContext,
-		ipChan:      make(chan netip.Addr, 255),
+		Ch:          make(chan netip.Addr, 255),
 	}
 
-	go w.workerLoop()
+	loop := func(cb callback) {
+		for ip := range w.Ch {
+			info := w.process(context.Background(), ip)
+			if info == nil {
+				continue
+			}
 
-	return &w
+			cb(ip, info)
+		}
+	}
+
+	return &w, loop
 }
 
 // If the value is too large - cut it and append "..."
@@ -220,40 +229,9 @@ func (w *WHOIS) process(ctx context.Context, ip netip.Addr) (wi *RuntimeClientWH
 	return wi
 }
 
-// Begin - begin requesting WHOIS info
-func (w *WHOIS) Begin(ip netip.Addr) {
-	ipBytes := ip.AsSlice()
-	now := uint64(time.Now().Unix())
-	expire := w.ipAddrs.Get(ipBytes)
-	if len(expire) != 0 {
-		exp := binary.BigEndian.Uint64(expire)
-		if exp > now {
-			return
-		}
-	}
-
-	expire = make([]byte, 8)
-	binary.BigEndian.PutUint64(expire, now+whoisTTL)
-	_ = w.ipAddrs.Set(ipBytes, expire)
-
-	log.Debug("whois: adding %s", ip)
-
-	select {
-	case w.ipChan <- ip:
-	default:
-		log.Debug("whois: queue is full")
-	}
-}
-
-// workerLoop processes the IP addresses it got from the channel and associates
-// the retrieving WHOIS info with a client.
-func (w *WHOIS) workerLoop() {
-	for ip := range w.ipChan {
-		info := w.process(context.Background(), ip)
-		if info == nil {
-			continue
-		}
-
-		w.clients.setWHOISInfo(ip, info)
-	}
+// RuntimeClientWHOISInfo is the filtered WHOIS data for a runtime client.
+type RuntimeClientWHOISInfo struct {
+	City    string `json:"city,omitempty"`
+	Country string `json:"country,omitempty"`
+	Orgname string `json:"orgname,omitempty"`
 }

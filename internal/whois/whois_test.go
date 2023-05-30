@@ -1,4 +1,4 @@
-package home
+package whois
 
 import (
 	"context"
