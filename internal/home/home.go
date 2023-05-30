@@ -33,7 +33,6 @@ import (
 	"github.com/AdguardTeam/AdGuardHome/internal/stats"
 	"github.com/AdguardTeam/AdGuardHome/internal/updater"
 	"github.com/AdguardTeam/AdGuardHome/internal/version"
-	"github.com/AdguardTeam/AdGuardHome/internal/whois"
 	"github.com/AdguardTeam/dnsproxy/upstream"
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/log"
@@ -58,7 +57,6 @@ type homeContext struct {
 	queryLog   querylog.QueryLog    // query log module
 	dnsServer  *dnsforward.Server   // DNS module
 	rdns       *RDNS                // rDNS module
-	whois      *whois.WHOIS         // WHOIS module
 	dhcpServer dhcpd.Interface      // DHCP module
 	auth       *Auth                // HTTP authentication module
 	filters    *filtering.DNSFilter // DNS filtering module
@@ -84,6 +82,8 @@ type homeContext struct {
 	tlsRoots         *x509.CertPool // list of root CAs for TLSv1.2
 	client           *http.Client
 	appSignalChannel chan os.Signal // Channel for receiving OS signals by the console app
+
+	whoisCh chan netip.Addr
 
 	// tlsCipherIDs are the ID of the cipher suites that AdGuard Home must use.
 	tlsCipherIDs []uint16

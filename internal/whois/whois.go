@@ -14,6 +14,7 @@ import (
 	"github.com/AdguardTeam/golibs/cache"
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/log"
+	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/golibs/stringutil"
 )
 
@@ -24,12 +25,8 @@ const (
 	whoisTTL       = 1 * 60 * 60 // 1 hour
 )
 
-type callback func(netip.Addr, *RuntimeClientWHOISInfo)
-
 // WHOIS - module context
 type WHOIS struct {
-	Ch chan netip.Addr
-
 	// dialContext specifies the dial function for creating unencrypted TCP
 	// connections.
 	dialContext func(ctx context.Context, network, addr string) (conn net.Conn, err error)
@@ -43,30 +40,18 @@ type WHOIS struct {
 	timeoutMsec uint
 }
 
-// InitWHOIS creates the WHOIS module context.
-func InitWHOIS(customDialContext func(context.Context, string, string) (net.Conn, error)) (*WHOIS, func(callback)) {
-	w := WHOIS{
+var Empty *WHOIS
+
+// New creates WHOIS.
+func New(customDialContext func(context.Context, string, string) (net.Conn, error)) *WHOIS {
+	return &WHOIS{
 		timeoutMsec: 5000,
 		ipAddrs: cache.New(cache.Config{
 			EnableLRU: true,
 			MaxCount:  10000,
 		}),
 		dialContext: customDialContext,
-		Ch:          make(chan netip.Addr, 255),
 	}
-
-	loop := func(cb callback) {
-		for ip := range w.Ch {
-			info := w.process(context.Background(), ip)
-			if info == nil {
-				continue
-			}
-
-			cb(ip, info)
-		}
-	}
-
-	return &w, loop
 }
 
 // If the value is too large - cut it and append "..."
@@ -201,8 +186,16 @@ func (w *WHOIS) queryAll(ctx context.Context, target string) (string, error) {
 	return "", fmt.Errorf("whois: redirect loop")
 }
 
-// Request WHOIS information
-func (w *WHOIS) process(ctx context.Context, ip netip.Addr) (wi *RuntimeClientWHOISInfo) {
+// Process returns WHOIS information
+func (w *WHOIS) Process(ctx context.Context, ip netip.Addr) (wi *RuntimeClientWHOISInfo) {
+	if w == nil {
+		return nil
+	}
+
+	if netutil.IsSpecialPurposeAddr(ip) {
+		return nil
+	}
+
 	resp, err := w.queryAll(ctx, ip.String())
 	if err != nil {
 		log.Debug("whois: error: %s  IP:%s", err, ip)

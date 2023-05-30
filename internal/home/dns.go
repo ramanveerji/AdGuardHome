@@ -170,17 +170,31 @@ func initDNSServer(
 		Context.rdns = NewRDNS(Context.dnsServer, &Context.clients, config.DNS.UsePrivateRDNS)
 	}
 
-	if config.Clients.Sources.WHOIS {
-		w, loop := whois.InitWHOIS(customDialContext)
-		Context.whois = w
+	Context.whoisCh = make(chan netip.Addr, 255)
 
-		go loop(func(ip netip.Addr, info *whois.RuntimeClientWHOISInfo) {
-			wi := (*RuntimeClientWHOISInfo)(info)
-			Context.clients.setWHOISInfo(ip, wi)
-		})
+	w := whois.Empty
+
+	if config.Clients.Sources.WHOIS {
+		w = whois.New(customDialContext)
 	}
 
+	go func() {
+		for ip := range Context.whoisCh {
+			info := w.Process(context.Background(), ip)
+			if info == nil {
+				continue
+			}
+
+			wi := (*RuntimeClientWHOISInfo)(info)
+			Context.clients.setWHOISInfo(ip, wi)
+		}
+	}()
+
 	return nil
+}
+
+type WHOISProcessor interface {
+	Process(context.Context, netip.Addr) *whois.RuntimeClientWHOISInfo
 }
 
 // parseSubnetSet parses a slice of subnets.  If the slice is empty, it returns
@@ -225,9 +239,7 @@ func onDNSRequest(pctx *proxy.DNSContext) {
 		Context.rdns.Begin(ip)
 	}
 
-	if srcs.WHOIS && !netutil.IsSpecialPurposeAddr(ip) {
-		Context.whois.Ch <- ip
-	}
+	Context.whoisCh <- ip
 }
 
 func ipsToTCPAddrs(ips []netip.Addr, port int) (tcpAddrs []*net.TCPAddr) {
@@ -470,9 +482,7 @@ func startDNSServer() error {
 			Context.rdns.Begin(ip)
 		}
 
-		if srcs.WHOIS && !netutil.IsSpecialPurposeAddr(ip) {
-			Context.whois.Ch <- ip
-		}
+		Context.whoisCh <- ip
 	}
 
 	return nil
