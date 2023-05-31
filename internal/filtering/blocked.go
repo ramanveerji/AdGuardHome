@@ -60,19 +60,6 @@ type dayRange struct {
 // fields, excluding the zero-length range ones.
 const maxDayRangeMinutes = 24*time.Hour - 1*time.Minute
 
-// zeroLengthRange returns a new zero-length day range.
-func zeroLengthRange() (r dayRange) {
-	return dayRange{
-		start: 0,
-		end:   0,
-	}
-}
-
-// isZeroLength returns true if r is a zero-length range.
-func (r dayRange) isZeroLength() (ok bool) {
-	return r.start == 0 && r.end == 0
-}
-
 // validate returns the day range validation errors, if any.
 func (r dayRange) validate() (err error) {
 	defer func() { err = errors.Annotate(err, "bad day range: %w") }()
@@ -81,7 +68,7 @@ func (r dayRange) validate() (err error) {
 	end := r.end.Truncate(time.Minute)
 
 	switch {
-	case r.isZeroLength():
+	case r == dayRange{}:
 		return nil
 	case start != r.start:
 		return fmt.Errorf("start %s isn't rounded to minutes", r.start)
@@ -172,7 +159,7 @@ func (s *BlockedSchedule) UnmarshalYAML(value *yaml.Node) (err error) {
 	}
 	for i, d := range days {
 		if d == nil {
-			bs.Week[i] = zeroLengthRange()
+			bs.Week[i] = dayRange{}
 
 			continue
 		}
@@ -203,32 +190,32 @@ func (s *BlockedSchedule) MarshalYAML() (v any, err error) {
 	return blockedScheduleConfig{
 		TimeZone: s.Location.String(),
 		Sunday: &day{
-			Start: timeutil.Duration{Duration: s.Week[0].start},
-			End:   timeutil.Duration{Duration: s.Week[0].end},
+			Start: timeutil.Duration{Duration: s.Week[time.Sunday].start},
+			End:   timeutil.Duration{Duration: s.Week[time.Sunday].end},
 		},
 		Monday: &day{
-			Start: timeutil.Duration{Duration: s.Week[1].start},
-			End:   timeutil.Duration{Duration: s.Week[1].end},
+			Start: timeutil.Duration{Duration: s.Week[time.Monday].start},
+			End:   timeutil.Duration{Duration: s.Week[time.Monday].end},
 		},
 		Tuesday: &day{
-			Start: timeutil.Duration{Duration: s.Week[2].start},
-			End:   timeutil.Duration{Duration: s.Week[2].end},
+			Start: timeutil.Duration{Duration: s.Week[time.Tuesday].start},
+			End:   timeutil.Duration{Duration: s.Week[time.Tuesday].end},
 		},
 		Wednesday: &day{
-			Start: timeutil.Duration{Duration: s.Week[3].start},
-			End:   timeutil.Duration{Duration: s.Week[3].end},
+			Start: timeutil.Duration{Duration: s.Week[time.Wednesday].start},
+			End:   timeutil.Duration{Duration: s.Week[time.Wednesday].end},
 		},
 		Thursday: &day{
-			Start: timeutil.Duration{Duration: s.Week[4].start},
-			End:   timeutil.Duration{Duration: s.Week[4].end},
+			Start: timeutil.Duration{Duration: s.Week[time.Thursday].start},
+			End:   timeutil.Duration{Duration: s.Week[time.Thursday].end},
 		},
 		Friday: &day{
-			Start: timeutil.Duration{Duration: s.Week[5].start},
-			End:   timeutil.Duration{Duration: s.Week[5].end},
+			Start: timeutil.Duration{Duration: s.Week[time.Friday].start},
+			End:   timeutil.Duration{Duration: s.Week[time.Friday].end},
 		},
 		Saturday: &day{
-			Start: timeutil.Duration{Duration: s.Week[6].start},
-			End:   timeutil.Duration{Duration: s.Week[6].end},
+			Start: timeutil.Duration{Duration: s.Week[time.Saturday].start},
+			End:   timeutil.Duration{Duration: s.Week[time.Saturday].end},
 		},
 	}, nil
 }
@@ -236,8 +223,8 @@ func (s *BlockedSchedule) MarshalYAML() (v any, err error) {
 // Contains returns true if t is within the allowed schedule.
 func (s *BlockedSchedule) Contains(t time.Time) (ok bool) {
 	t = t.In(s.Location)
-	r := s.Week[int(t.Weekday())]
-	if r.isZeroLength() {
+	r := s.Week[t.Weekday()]
+	if (r == dayRange{}) {
 		return false
 	}
 

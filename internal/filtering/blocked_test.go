@@ -19,14 +19,14 @@ func TestBlockedSchedule_Contains(t *testing.T) {
 	// baseSchedule, 12:00:00 to 13:59:59.
 	baseSchedule := &BlockedSchedule{
 		Week: [7]dayRange{
-			zeroLengthRange(),
-			zeroLengthRange(),
-			zeroLengthRange(),
-			zeroLengthRange(),
-			zeroLengthRange(),
+			{},
+			{},
+			{},
+			{},
+			{},
 			// baseTime is on Friday.
 			{start: 12 * time.Hour, end: 14*time.Hour - 1*time.Minute},
-			zeroLengthRange(),
+			{},
 		},
 		Location: time.UTC,
 	}
@@ -34,14 +34,14 @@ func TestBlockedSchedule_Contains(t *testing.T) {
 	// allDaySchedule, 00:00:00 to 23:59:59.
 	allDaySchedule := &BlockedSchedule{
 		Week: [7]dayRange{
-			zeroLengthRange(),
-			zeroLengthRange(),
-			zeroLengthRange(),
-			zeroLengthRange(),
-			zeroLengthRange(),
+			{},
+			{},
+			{},
+			{},
+			{},
 			// baseTime is on Friday.
 			{start: 0, end: 24*time.Hour - 1*time.Minute},
-			zeroLengthRange(),
+			{},
 		},
 		Location: time.UTC,
 	}
