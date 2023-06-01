@@ -41,8 +41,6 @@ type Lease struct {
 	HWAddr net.HardwareAddr `json:"mac"`
 
 	// IP is the IP address leased to the client.
-	//
-	// TODO(a.garipov): Migrate leases.db.
 	IP netip.Addr `json:"ip"`
 
 	// IsStatic defines if the lease is static.
