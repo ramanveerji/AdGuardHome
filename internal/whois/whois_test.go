@@ -50,6 +50,8 @@ func (c *fakeConn) fakeDial(ctx context.Context, network, addr string) (conn net
 	return c, nil
 }
 
+const maxInfoLen = 250
+
 func TestWHOIS(t *testing.T) {
 	const (
 		nl   = "\n"
@@ -62,14 +64,17 @@ func TestWHOIS(t *testing.T) {
 		data: []byte(data),
 	}
 
-	w := WHOIS{
-		timeoutMsec: 5000,
-		dialContext: fc.fakeDial,
+	w := Default{
+		timeout:         5000 * time.Millisecond,
+		dialContext:     fc.fakeDial,
+		maxConnReadSize: 1024,
+		maxRedirects:    5,
+		maxInfoLen:      maxInfoLen,
 	}
 	resp, err := w.queryAll(context.Background(), "1.2.3.4")
 	assert.NoError(t, err)
 
-	m := whoisParse(resp)
+	m := whoisParse(resp, maxInfoLen)
 	require.NotEmpty(t, m)
 
 	assert.Equal(t, "FakeOrg LLC", m["orgname"])
@@ -145,7 +150,7 @@ func TestWHOISParse(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := whoisParse(tc.in)
+			got := whoisParse(tc.in, maxInfoLen)
 			assert.Equal(t, tc.want, got)
 		})
 	}

@@ -83,6 +83,7 @@ type homeContext struct {
 	client           *http.Client
 	appSignalChannel chan os.Signal // Channel for receiving OS signals by the console app
 
+	// whoisCh is the channel for receiving IPs for WHOIS processing.
 	whoisCh chan netip.Addr
 
 	// tlsCipherIDs are the ID of the cipher suites that AdGuard Home must use.

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/netip"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,48 +19,97 @@ import (
 	"github.com/AdguardTeam/golibs/stringutil"
 )
 
-const (
-	defaultServer  = "whois.arin.net"
-	defaultPort    = "43"
-	maxValueLength = 250
-	whoisTTL       = 1 * 60 * 60 // 1 hour
-)
+// Empty does nothing.
+type Empty struct{}
 
-// WHOIS - module context
-type WHOIS struct {
+// Process implements the [home.WHOIS] interface for Empty.
+func (Empty) Process(context.Context, netip.Addr) *Info {
+	return nil
+}
+
+// Config is the configuration structure for Default.
+type Config struct {
+	// DialContext specifies the dial function for creating unencrypted TCP
+	// connections.
+	DialContext func(ctx context.Context, network, addr string) (conn net.Conn, err error)
+
+	// Server is the WHOIS server.
+	Server string
+
+	// Timeout is the timeout for WHOIS requests.
+	Timeout time.Duration
+
+	// CacheSize is the maximum size of the cache.  If it's zero, cache size is
+	// unlimited.
+	CacheSize uint
+
+	// MaxConnReadSize is an upper limit in bytes for reading from net.Conn.
+	MaxConnReadSize int64
+
+	// MaxRedirects is the maximum redirects count.
+	MaxRedirects int
+
+	// MaxInfoLen is the maximum length of Info fields returned by Process.
+	MaxInfoLen int
+
+	// Port is the port for WHOIS requests.
+	Port int
+}
+
+// Default provides WHOIS functionality.
+type Default struct {
+	// ipAddrs is the cache containing IP addresses of clients.  An active IP
+	// address is resolved once again after it expires.  If IP address couldn't
+	// be resolved, it stays here for some time to prevent further attempts to
+	// resolve the same IP.
+	ipAddrs cache.Cache
+
 	// dialContext specifies the dial function for creating unencrypted TCP
 	// connections.
 	dialContext func(ctx context.Context, network, addr string) (conn net.Conn, err error)
 
-	// Contains IP addresses of clients
-	// An active IP address is resolved once again after it expires.
-	// If IP address couldn't be resolved, it stays here for some time to prevent further attempts to resolve the same IP.
-	ipAddrs cache.Cache
+	// server is the WHOIS server.
+	server string
 
-	// TODO(a.garipov): Rewrite to use time.Duration.  Like, seriously, why?
-	timeoutMsec uint
+	// timeout is the timeout for WHOIS requests.
+	timeout time.Duration
+
+	// maxConnReadSize is an upper limit in bytes for reading from net.Conn.
+	maxConnReadSize int64
+
+	// maxRedirects is the maximum redirects count.
+	maxRedirects int
+
+	// port for WHOIS requests.
+	port int
+
+	// maxInfoLen is the maximum length of Info fields returned by Process.
+	maxInfoLen int
 }
 
-var Empty *WHOIS
-
-// New creates WHOIS.
-func New(customDialContext func(context.Context, string, string) (net.Conn, error)) *WHOIS {
-	return &WHOIS{
-		timeoutMsec: 5000,
+// New creates Default.
+func New(config Config) (w *Default) {
+	return &Default{
+		server:      config.Server,
+		dialContext: config.DialContext,
+		timeout:     config.Timeout,
 		ipAddrs: cache.New(cache.Config{
 			EnableLRU: true,
-			MaxCount:  10000,
+			MaxCount:  config.CacheSize,
 		}),
-		dialContext: customDialContext,
+		maxConnReadSize: config.MaxConnReadSize,
+		port:            config.Port,
 	}
 }
 
-// If the value is too large - cut it and append "..."
-func trimValue(s string) string {
-	if len(s) <= maxValueLength {
+// trimValue cuts s and appends "...", if value length is equal or greater than
+// max.  max must be greater than 3.
+func trimValue(s string, max int) string {
+	if len(s) <= max {
 		return s
 	}
-	return s[:maxValueLength-3] + "..."
+
+	return s[:max-3] + "..."
 }
 
 // isWHOISComment returns true if the string is empty or is a WHOIS comment.
@@ -70,9 +120,9 @@ func isWHOISComment(s string) (ok bool) {
 // strmap is an alias for convenience.
 type strmap = map[string]string
 
-// whoisParse parses a subset of plain-text data from the WHOIS response into
-// a string map.
-func whoisParse(data string) (m strmap) {
+// whoisParse parses a subset of plain-text data from the WHOIS response into a
+// string map.  maxLen is the maximum field length of returned map.
+func whoisParse(data string, maxLen int) (m strmap) {
 	m = strmap{}
 
 	var orgname string
@@ -96,10 +146,10 @@ func whoisParse(data string) (m strmap) {
 		switch k {
 		case "orgname", "org-name":
 			k = "orgname"
-			v = trimValue(v)
+			v = trimValue(v, maxLen)
 			orgname = v
 		case "city", "country":
-			v = trimValue(v)
+			v = trimValue(v, maxLen)
 		case "descr", "netname":
 			k = "orgname"
 			v = stringutil.Coalesce(orgname, v)
@@ -119,11 +169,8 @@ func whoisParse(data string) (m strmap) {
 	return m
 }
 
-// MaxConnReadSize is an upper limit in bytes for reading from net.Conn.
-const MaxConnReadSize = 64 * 1024
-
-// Send request to a server and receive the response
-func (w *WHOIS) query(ctx context.Context, target, serverAddr string) (data string, err error) {
+// query sends request to a server and returns the response or error.
+func (w *Default) query(ctx context.Context, target, serverAddr string) (data string, err error) {
 	addr, _, _ := net.SplitHostPort(serverAddr)
 	if addr == "whois.arin.net" {
 		target = "n + " + target
@@ -133,14 +180,15 @@ func (w *WHOIS) query(ctx context.Context, target, serverAddr string) (data stri
 	if err != nil {
 		return "", err
 	}
+
 	defer func() { err = errors.WithDeferred(err, conn.Close()) }()
 
-	r, err := aghio.LimitReader(conn, MaxConnReadSize)
+	r, err := aghio.LimitReader(conn, w.maxConnReadSize)
 	if err != nil {
 		return "", err
 	}
 
-	_ = conn.SetReadDeadline(time.Now().Add(time.Duration(w.timeoutMsec) * time.Millisecond))
+	_ = conn.SetReadDeadline(time.Now().Add(w.timeout))
 	_, err = conn.Write([]byte(target + "\r\n"))
 	if err != nil {
 		return "", err
@@ -156,42 +204,43 @@ func (w *WHOIS) query(ctx context.Context, target, serverAddr string) (data stri
 	return string(whoisData), nil
 }
 
-// Query WHOIS servers (handle redirects)
-func (w *WHOIS) queryAll(ctx context.Context, target string) (string, error) {
-	server := net.JoinHostPort(defaultServer, defaultPort)
-	const maxRedirects = 5
-	for i := 0; i != maxRedirects; i++ {
-		resp, err := w.query(ctx, target, server)
+// queryAll queries WHOIS server and handles redirects.
+func (w *Default) queryAll(ctx context.Context, target string) (data string, err error) {
+	port := strconv.Itoa(w.port)
+	server := net.JoinHostPort(w.server, port)
+	var resp string
+
+	for i := 0; i != w.maxRedirects; i++ {
+		resp, err = w.query(ctx, target, server)
 		if err != nil {
 			return "", err
 		}
+
 		log.Debug("whois: received response (%d bytes) from %s  IP:%s", len(resp), server, target)
 
-		m := whoisParse(resp)
+		m := whoisParse(resp, w.maxInfoLen)
 		redir, ok := m["whois"]
 		if !ok {
 			return resp, nil
 		}
+
 		redir = strings.ToLower(redir)
 
 		_, _, err = net.SplitHostPort(redir)
 		if err != nil {
-			server = net.JoinHostPort(redir, defaultPort)
+			server = net.JoinHostPort(redir, port)
 		} else {
 			server = redir
 		}
 
 		log.Debug("whois: redirected to %s  IP:%s", redir, target)
 	}
+
 	return "", fmt.Errorf("whois: redirect loop")
 }
 
-// Process returns WHOIS information
-func (w *WHOIS) Process(ctx context.Context, ip netip.Addr) (wi *RuntimeClientWHOISInfo) {
-	if w == nil {
-		return nil
-	}
-
+// Process makes WHOIS request and returns WHOIS information or nil.
+func (w *Default) Process(ctx context.Context, ip netip.Addr) (wi *Info) {
 	if netutil.IsSpecialPurposeAddr(ip) {
 		return nil
 	}
@@ -205,9 +254,9 @@ func (w *WHOIS) Process(ctx context.Context, ip netip.Addr) (wi *RuntimeClientWH
 
 	log.Debug("whois: IP:%s  response: %d bytes", ip, len(resp))
 
-	m := whoisParse(resp)
+	m := whoisParse(resp, w.maxInfoLen)
 
-	wi = &RuntimeClientWHOISInfo{
+	wi = &Info{
 		City:    m["city"],
 		Country: m["country"],
 		Orgname: m["orgname"],
@@ -215,15 +264,15 @@ func (w *WHOIS) Process(ctx context.Context, ip netip.Addr) (wi *RuntimeClientWH
 
 	// Don't return an empty struct so that the frontend doesn't get
 	// confused.
-	if *wi == (RuntimeClientWHOISInfo{}) {
+	if *wi == (Info{}) {
 		return nil
 	}
 
 	return wi
 }
 
-// RuntimeClientWHOISInfo is the filtered WHOIS data for a runtime client.
-type RuntimeClientWHOISInfo struct {
+// Info is the filtered WHOIS data for a runtime client.
+type Info struct {
 	City    string `json:"city,omitempty"`
 	Country string `json:"country,omitempty"`
 	Orgname string `json:"orgname,omitempty"`

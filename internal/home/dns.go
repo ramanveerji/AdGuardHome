@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/AdguardTeam/AdGuardHome/internal/aghalg"
 	"github.com/AdguardTeam/AdGuardHome/internal/aghhttp"
@@ -28,6 +29,7 @@ import (
 
 // Default ports.
 const (
+	defaultPortWHOIS = 43
 	defaultPortDNS   = 53
 	defaultPortHTTP  = 80
 	defaultPortHTTPS = 443
@@ -170,13 +172,55 @@ func initDNSServer(
 		Context.rdns = NewRDNS(Context.dnsServer, &Context.clients, config.DNS.UsePrivateRDNS)
 	}
 
-	Context.whoisCh = make(chan netip.Addr, 255)
+	const (
+		// defaultServerWHOIS is the default WHOIS server.
+		defaultServerWHOIS = "whois.arin.net"
 
-	w := whois.Empty
+		// queueSizeWHOIS is the size of queue of IPs for WHOIS processing.
+		queueSizeWHOIS = 255
+
+		// timeoutWHOIS is the timeout for WHOIS requests.
+		timeoutWHOIS = 5 * time.Second
+
+		// cacheSizeWHOIS is the maximum size of the cache.  If it's zero,
+		// cache size is unlimited.
+		cacheSizeWHOIS = 10_000
+
+		// maxConnReadSizeWHOIS is an upper limit in bytes for reading from
+		// net.Conn.
+		maxConnReadSizeWHOIS = 64 * 1024
+
+		// maxRedirectsWHOIS is the maximum redirects count.
+		maxRedirectsWHOIS = 5
+
+		// maxInfoLenWHOIS is the maximum length of whois.Info fields.
+		maxInfoLenWHOIS = 250
+	)
+
+	Context.whoisCh = make(chan netip.Addr, queueSizeWHOIS)
+
+	var w WHOIS
 
 	if config.Clients.Sources.WHOIS {
-		w = whois.New(customDialContext)
+		w = whois.New(whois.Config{
+			DialContext:     customDialContext,
+			Server:          defaultServerWHOIS,
+			Port:            defaultPortWHOIS,
+			Timeout:         timeoutWHOIS,
+			CacheSize:       cacheSizeWHOIS,
+			MaxConnReadSize: maxConnReadSizeWHOIS,
+			MaxRedirects:    maxRedirectsWHOIS,
+			MaxInfoLen:      maxInfoLenWHOIS,
+		})
+	} else {
+		w = whois.Empty{}
 	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Debug("whois panic: %s", r)
+		}
+	}()
 
 	go func() {
 		for ip := range Context.whoisCh {
@@ -193,8 +237,8 @@ func initDNSServer(
 	return nil
 }
 
-type WHOISProcessor interface {
-	Process(context.Context, netip.Addr) *whois.RuntimeClientWHOISInfo
+type WHOIS interface {
+	Process(context.Context, netip.Addr) *whois.Info
 }
 
 // parseSubnetSet parses a slice of subnets.  If the slice is empty, it returns
