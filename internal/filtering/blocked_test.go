@@ -68,6 +68,11 @@ func TestBlockedSchedule_Contains(t *testing.T) {
 		name:     "same_day_outside",
 	}, {
 		schedule: allDaySchedule,
+		assert:   assert.True,
+		t:        baseTime.Add(24*time.Hour - time.Second),
+		name:     "same_day_last_second",
+	}, {
+		schedule: allDaySchedule,
 		assert:   assert.False,
 		t:        otherTime,
 		name:     "other_day_all_day",
