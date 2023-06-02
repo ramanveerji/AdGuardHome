@@ -19,10 +19,19 @@ import (
 	"github.com/AdguardTeam/golibs/stringutil"
 )
 
-// Empty is an empty [home.WHOIS] implementation which does nothing.
+// Interface provides WHOIS functionality.
+type Interface interface {
+	// Process makes WHOIS request and returns WHOIS information or nil.
+	Process(_ context.Context, _ netip.Addr) (_ *Info)
+}
+
+// Empty is an empty [Interface] implementation which does nothing.
 type Empty struct{}
 
-// Process implements the [home.WHOIS] interface for Empty.
+// type check
+var _ Interface = (*Empty)(nil)
+
+// Process implements the [Interface] interface for Empty.
 func (Empty) Process(_ context.Context, _ netip.Addr) (_ *Info) {
 	return nil
 }
@@ -53,7 +62,7 @@ type Config struct {
 	MaxInfoLen int
 
 	// Port is the port for WHOIS requests.
-	Port int
+	Port uint16
 }
 
 // Default provides WHOIS functionality.
@@ -88,19 +97,19 @@ type Default struct {
 }
 
 // New creates Default.
-func New(config Config) (w *Default) {
+func New(conf *Config) (w *Default) {
 	return &Default{
-		serverAddr:  config.ServerAddr,
-		dialContext: config.DialContext,
-		timeout:     config.Timeout,
+		serverAddr:  conf.ServerAddr,
+		dialContext: conf.DialContext,
+		timeout:     conf.Timeout,
 		ipAddrs: cache.New(cache.Config{
 			EnableLRU: true,
-			MaxCount:  config.CacheSize,
+			MaxCount:  conf.CacheSize,
 		}),
-		maxConnReadSize: config.MaxConnReadSize,
-		maxRedirects:    config.MaxRedirects,
-		portStr:         strconv.Itoa(config.Port),
-		maxInfoLen:      config.MaxInfoLen,
+		maxConnReadSize: conf.MaxConnReadSize,
+		maxRedirects:    conf.MaxRedirects,
+		portStr:         strconv.Itoa(int(conf.Port)),
+		maxInfoLen:      conf.MaxInfoLen,
 	}
 }
 
@@ -170,8 +179,13 @@ func whoisParse(data string, maxLen int) (m map[string]string) {
 
 // query sends request to a server and returns the response or error.
 func (w *Default) query(ctx context.Context, target, serverAddr string) (data string, err error) {
+	const arinWHOIS = "whois.arin.net"
+
 	addr, _, _ := net.SplitHostPort(serverAddr)
-	if addr == "whois.arin.net" {
+	if addr == arinWHOIS {
+		// Display type flags for query.
+		//
+		// See https://www.arin.net/resources/registry/whois/rws/api/.
 		target = "n + " + target
 	}
 
@@ -179,7 +193,6 @@ func (w *Default) query(ctx context.Context, target, serverAddr string) (data st
 	if err != nil {
 		return "", err
 	}
-
 	defer func() { err = errors.WithDeferred(err, conn.Close()) }()
 
 	r, err := aghio.LimitReader(conn, w.maxConnReadSize)
@@ -188,7 +201,7 @@ func (w *Default) query(ctx context.Context, target, serverAddr string) (data st
 	}
 
 	_ = conn.SetReadDeadline(time.Now().Add(w.timeout))
-	_, err = conn.Write([]byte(target + "\r\n"))
+	_, err = io.WriteString(conn, target+"\r\n")
 	if err != nil {
 		return "", err
 	}
@@ -236,6 +249,9 @@ func (w *Default) queryAll(ctx context.Context, target string) (data string, err
 
 	return "", fmt.Errorf("whois: redirect loop")
 }
+
+// type check
+var _ Interface = (*Default)(nil)
 
 // Process makes WHOIS request and returns WHOIS information or nil.
 func (w *Default) Process(ctx context.Context, ip netip.Addr) (wi *Info) {

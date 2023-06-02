@@ -206,10 +206,10 @@ func initWHOIS() {
 
 	Context.whoisCh = make(chan netip.Addr, queueSizeWHOIS)
 
-	var w WHOIS
+	var w whois.Interface
 
 	if config.Clients.Sources.WHOIS {
-		w = whois.New(whois.Config{
+		w = whois.New(&whois.Config{
 			DialContext:     customDialContext,
 			ServerAddr:      defaultServerWHOIS,
 			Port:            defaultPortWHOIS,
@@ -227,22 +227,14 @@ func initWHOIS() {
 		defer log.OnPanic("whois")
 
 		for ip := range Context.whoisCh {
-
 			info := w.Process(context.Background(), ip)
 			if info == nil {
 				continue
 			}
 
-			wi := (*RuntimeClientWHOISInfo)(info)
-			Context.clients.setWHOISInfo(ip, wi)
+			Context.clients.setWHOISInfo(ip, info)
 		}
 	}()
-}
-
-// WHOIS provides WHOIS functionality.
-type WHOIS interface {
-	// Process makes WHOIS request and returns WHOIS information or nil.
-	Process(context.Context, netip.Addr) *whois.Info
 }
 
 // parseSubnetSet parses a slice of subnets.  If the slice is empty, it returns

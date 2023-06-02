@@ -9,6 +9,7 @@ import (
 	"github.com/AdguardTeam/AdGuardHome/internal/aghalg"
 	"github.com/AdguardTeam/AdGuardHome/internal/aghhttp"
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering"
+	"github.com/AdguardTeam/AdGuardHome/internal/whois"
 )
 
 // clientJSON is a common structure used by several handlers to deal with
@@ -28,7 +29,7 @@ type clientJSON struct {
 	// the allowlist.
 	DisallowedRule *string `json:"disallowed_rule,omitempty"`
 
-	WHOISInfo      *RuntimeClientWHOISInfo     `json:"whois_info,omitempty"`
+	WHOISInfo      *whois.Info                 `json:"whois_info,omitempty"`
 	SafeSearchConf *filtering.SafeSearchConfig `json:"safe_search"`
 
 	Name string `json:"name"`
@@ -51,7 +52,7 @@ type clientJSON struct {
 }
 
 type runtimeClientJSON struct {
-	WHOISInfo *RuntimeClientWHOISInfo `json:"whois_info"`
+	WHOISInfo *whois.Info `json:"whois_info"`
 
 	IP     netip.Addr   `json:"ip"`
 	Name   string       `json:"name"`
@@ -344,7 +345,7 @@ func (clients *clientsContainer) findRuntime(ip netip.Addr, idStr string) (cj *c
 			IDs:            []string{idStr},
 			Disallowed:     &disallowed,
 			DisallowedRule: &rule,
-			WHOISInfo:      &RuntimeClientWHOISInfo{},
+			WHOISInfo:      &whois.Info{},
 		}
 
 		return cj

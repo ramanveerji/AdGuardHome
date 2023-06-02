@@ -4,11 +4,11 @@ import (
 	"context"
 	"io"
 	"net"
+	"net/netip"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // fakeConn is a mock implementation of net.Conn to simplify testing.
@@ -64,22 +64,19 @@ func TestWHOIS(t *testing.T) {
 		data: []byte(data),
 	}
 
-	w := Default{
-		timeout:         5000 * time.Millisecond,
-		dialContext:     fc.fakeDial,
-		maxConnReadSize: 1024,
-		maxRedirects:    5,
-		maxInfoLen:      maxInfoLen,
-	}
-	resp, err := w.queryAll(context.Background(), "1.2.3.4")
-	assert.NoError(t, err)
+	w := New(&Config{
+		Timeout:         5000 * time.Millisecond,
+		DialContext:     fc.fakeDial,
+		MaxConnReadSize: 1024,
+		MaxRedirects:    5,
+		MaxInfoLen:      maxInfoLen,
+	})
+	info := w.Process(context.Background(), netip.MustParseAddr("1.2.3.4"))
+	assert.NotNil(t, info)
 
-	m := whoisParse(resp, maxInfoLen)
-	require.NotEmpty(t, m)
-
-	assert.Equal(t, "FakeOrg LLC", m["orgname"])
-	assert.Equal(t, "Imagiland", m["country"])
-	assert.Equal(t, "Nonreal", m["city"])
+	assert.Equal(t, "FakeOrg LLC", info.Orgname)
+	assert.Equal(t, "Imagiland", info.Country)
+	assert.Equal(t, "Nonreal", info.City)
 }
 
 func TestWHOISParse(t *testing.T) {

@@ -14,6 +14,7 @@ import (
 	"github.com/AdguardTeam/AdGuardHome/internal/dnsforward"
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering"
 	"github.com/AdguardTeam/AdGuardHome/internal/querylog"
+	"github.com/AdguardTeam/AdGuardHome/internal/whois"
 	"github.com/AdguardTeam/dnsproxy/proxy"
 	"github.com/AdguardTeam/dnsproxy/upstream"
 	"github.com/AdguardTeam/golibs/errors"
@@ -307,18 +308,6 @@ func (clients *clientsContainer) clientSource(ip netip.Addr) (src clientSource) 
 	return rc.Source
 }
 
-func toQueryLogWHOIS(wi *RuntimeClientWHOISInfo) (cw *querylog.ClientWHOIS) {
-	if wi == nil {
-		return &querylog.ClientWHOIS{}
-	}
-
-	return &querylog.ClientWHOIS{
-		City:    wi.City,
-		Country: wi.Country,
-		Orgname: wi.Orgname,
-	}
-}
-
 // findMultiple is a wrapper around Find to make it a valid client finder for
 // the query log.  c is never nil; if no information about the client is found,
 // it returns an artificial client record by only setting the blocking-related
@@ -352,7 +341,7 @@ func (clients *clientsContainer) clientOrArtificial(
 	defer func() {
 		c.Disallowed, c.DisallowedRule = clients.dnsServer.IsBlockedClient(ip, id)
 		if c.WHOIS == nil {
-			c.WHOIS = &querylog.ClientWHOIS{}
+			c.WHOIS = &whois.Info{}
 		}
 	}()
 
@@ -369,7 +358,7 @@ func (clients *clientsContainer) clientOrArtificial(
 	if ok {
 		return &querylog.Client{
 			Name:  rc.Host,
-			WHOIS: toQueryLogWHOIS(rc.WHOISInfo),
+			WHOIS: rc.WHOISInfo,
 		}, false
 	}
 
@@ -701,7 +690,7 @@ func (clients *clientsContainer) Update(prev, c *Client) (err error) {
 }
 
 // setWHOISInfo sets the WHOIS information for a client.
-func (clients *clientsContainer) setWHOISInfo(ip netip.Addr, wi *RuntimeClientWHOISInfo) {
+func (clients *clientsContainer) setWHOISInfo(ip netip.Addr, wi *whois.Info) {
 	clients.lock.Lock()
 	defer clients.lock.Unlock()
 
@@ -764,7 +753,7 @@ func (clients *clientsContainer) addHostLocked(
 		rc = &RuntimeClient{
 			Host:      host,
 			Source:    src,
-			WHOISInfo: &RuntimeClientWHOISInfo{},
+			WHOISInfo: &whois.Info{},
 		}
 
 		clients.ipToRC[ip] = rc

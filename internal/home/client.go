@@ -7,6 +7,7 @@ import (
 
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering"
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering/safesearch"
+	"github.com/AdguardTeam/AdGuardHome/internal/whois"
 	"github.com/AdguardTeam/dnsproxy/proxy"
 	"github.com/AdguardTeam/golibs/stringutil"
 )
@@ -127,14 +128,7 @@ func (cs clientSource) MarshalText() (text []byte, err error) {
 // RuntimeClient is a client information about which has been obtained using the
 // source described in the Source field.
 type RuntimeClient struct {
-	WHOISInfo *RuntimeClientWHOISInfo
+	WHOISInfo *whois.Info
 	Host      string
 	Source    clientSource
-}
-
-// RuntimeClientWHOISInfo is the filtered WHOIS data for a runtime client.
-type RuntimeClientWHOISInfo struct {
-	City    string `json:"city,omitempty"`
-	Country string `json:"country,omitempty"`
-	Orgname string `json:"orgname,omitempty"`
 }

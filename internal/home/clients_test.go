@@ -9,6 +9,7 @@ import (
 
 	"github.com/AdguardTeam/AdGuardHome/internal/dhcpd"
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering"
+	"github.com/AdguardTeam/AdGuardHome/internal/whois"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -199,7 +200,7 @@ func TestClients(t *testing.T) {
 
 func TestClientsWHOIS(t *testing.T) {
 	clients := newClientsContainer()
-	whois := &RuntimeClientWHOISInfo{
+	whois := &whois.Info{
 		Country: "AU",
 		Orgname: "Example Org",
 	}
