@@ -172,6 +172,13 @@ func initDNSServer(
 		Context.rdns = NewRDNS(Context.dnsServer, &Context.clients, config.DNS.UsePrivateRDNS)
 	}
 
+	initWHOIS()
+
+	return nil
+}
+
+// initWHOIS initializes the WHOIS.
+func initWHOIS() {
 	const (
 		// defaultServerWHOIS is the default WHOIS server.
 		defaultServerWHOIS = "whois.arin.net"
@@ -204,7 +211,7 @@ func initDNSServer(
 	if config.Clients.Sources.WHOIS {
 		w = whois.New(whois.Config{
 			DialContext:     customDialContext,
-			Server:          defaultServerWHOIS,
+			ServerAddr:      defaultServerWHOIS,
 			Port:            defaultPortWHOIS,
 			Timeout:         timeoutWHOIS,
 			CacheSize:       cacheSizeWHOIS,
@@ -216,14 +223,11 @@ func initDNSServer(
 		w = whois.Empty{}
 	}
 
-	defer func() {
-		if r := recover(); r != nil {
-			log.Debug("whois panic: %s", r)
-		}
-	}()
-
 	go func() {
+		defer log.OnPanic("whois")
+
 		for ip := range Context.whoisCh {
+
 			info := w.Process(context.Background(), ip)
 			if info == nil {
 				continue
@@ -233,11 +237,11 @@ func initDNSServer(
 			Context.clients.setWHOISInfo(ip, wi)
 		}
 	}()
-
-	return nil
 }
 
+// WHOIS provides WHOIS functionality.
 type WHOIS interface {
+	// Process makes WHOIS request and returns WHOIS information or nil.
 	Process(context.Context, netip.Addr) *whois.Info
 }
 

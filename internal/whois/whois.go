@@ -19,11 +19,11 @@ import (
 	"github.com/AdguardTeam/golibs/stringutil"
 )
 
-// Empty does nothing.
+// Empty is an empty [home.WHOIS] implementation which does nothing.
 type Empty struct{}
 
 // Process implements the [home.WHOIS] interface for Empty.
-func (Empty) Process(context.Context, netip.Addr) *Info {
+func (Empty) Process(_ context.Context, _ netip.Addr) (_ *Info) {
 	return nil
 }
 
@@ -33,8 +33,8 @@ type Config struct {
 	// connections.
 	DialContext func(ctx context.Context, network, addr string) (conn net.Conn, err error)
 
-	// Server is the WHOIS server.
-	Server string
+	// ServerAddr is the address of the WHOIS server.
+	ServerAddr string
 
 	// Timeout is the timeout for WHOIS requests.
 	Timeout time.Duration
@@ -64,12 +64,15 @@ type Default struct {
 	// resolve the same IP.
 	ipAddrs cache.Cache
 
-	// dialContext specifies the dial function for creating unencrypted TCP
-	// connections.
+	// dialContext connects to a remote server resolving hostname using our own
+	// DNS server and unecrypted TCP connection.
 	dialContext func(ctx context.Context, network, addr string) (conn net.Conn, err error)
 
-	// server is the WHOIS server.
-	server string
+	// serverAddr is the address of the WHOIS server.
+	serverAddr string
+
+	// portStr is the port for WHOIS requests.
+	portStr string
 
 	// timeout is the timeout for WHOIS requests.
 	timeout time.Duration
@@ -80,9 +83,6 @@ type Default struct {
 	// maxRedirects is the maximum redirects count.
 	maxRedirects int
 
-	// port for WHOIS requests.
-	port int
-
 	// maxInfoLen is the maximum length of Info fields returned by Process.
 	maxInfoLen int
 }
@@ -90,7 +90,7 @@ type Default struct {
 // New creates Default.
 func New(config Config) (w *Default) {
 	return &Default{
-		server:      config.Server,
+		serverAddr:  config.ServerAddr,
 		dialContext: config.DialContext,
 		timeout:     config.Timeout,
 		ipAddrs: cache.New(cache.Config{
@@ -98,7 +98,9 @@ func New(config Config) (w *Default) {
 			MaxCount:  config.CacheSize,
 		}),
 		maxConnReadSize: config.MaxConnReadSize,
-		port:            config.Port,
+		maxRedirects:    config.MaxRedirects,
+		portStr:         strconv.Itoa(config.Port),
+		maxInfoLen:      config.MaxInfoLen,
 	}
 }
 
@@ -117,13 +119,10 @@ func isWHOISComment(s string) (ok bool) {
 	return len(s) == 0 || s[0] == '#' || s[0] == '%'
 }
 
-// strmap is an alias for convenience.
-type strmap = map[string]string
-
 // whoisParse parses a subset of plain-text data from the WHOIS response into a
 // string map.  maxLen is the maximum field length of returned map.
-func whoisParse(data string, maxLen int) (m strmap) {
-	m = strmap{}
+func whoisParse(data string, maxLen int) (m map[string]string) {
+	m = make(map[string]string)
 
 	var orgname string
 	lines := strings.Split(data, "\n")
@@ -206,8 +205,7 @@ func (w *Default) query(ctx context.Context, target, serverAddr string) (data st
 
 // queryAll queries WHOIS server and handles redirects.
 func (w *Default) queryAll(ctx context.Context, target string) (data string, err error) {
-	port := strconv.Itoa(w.port)
-	server := net.JoinHostPort(w.server, port)
+	server := net.JoinHostPort(w.serverAddr, w.portStr)
 	var resp string
 
 	for i := 0; i != w.maxRedirects; i++ {
@@ -228,7 +226,7 @@ func (w *Default) queryAll(ctx context.Context, target string) (data string, err
 
 		_, _, err = net.SplitHostPort(redir)
 		if err != nil {
-			server = net.JoinHostPort(redir, port)
+			server = net.JoinHostPort(redir, w.portStr)
 		} else {
 			server = redir
 		}

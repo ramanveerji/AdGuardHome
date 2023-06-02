@@ -91,59 +91,59 @@ func TestWHOISParse(t *testing.T) {
 	)
 
 	testCases := []struct {
-		want strmap
+		want map[string]string
 		name string
 		in   string
 	}{{
-		want: strmap{},
+		want: map[string]string{},
 		name: "empty",
 		in:   ``,
 	}, {
-		want: strmap{},
+		want: map[string]string{},
 		name: "comments",
 		in:   "%\n#",
 	}, {
-		want: strmap{},
+		want: map[string]string{},
 		name: "no_colon",
 		in:   "city",
 	}, {
-		want: strmap{},
+		want: map[string]string{},
 		name: "no_value",
 		in:   "city:",
 	}, {
-		want: strmap{"city": city},
+		want: map[string]string{"city": city},
 		name: "city",
 		in:   `city: ` + city,
 	}, {
-		want: strmap{"country": country},
+		want: map[string]string{"country": country},
 		name: "country",
 		in:   `country: ` + country,
 	}, {
-		want: strmap{"orgname": orgname},
+		want: map[string]string{"orgname": orgname},
 		name: "orgname",
 		in:   `orgname: ` + orgname,
 	}, {
-		want: strmap{"orgname": orgname},
+		want: map[string]string{"orgname": orgname},
 		name: "orgname_hyphen",
 		in:   `org-name: ` + orgname,
 	}, {
-		want: strmap{"orgname": orgname},
+		want: map[string]string{"orgname": orgname},
 		name: "orgname_descr",
 		in:   `descr: ` + orgname,
 	}, {
-		want: strmap{"orgname": orgname},
+		want: map[string]string{"orgname": orgname},
 		name: "orgname_netname",
 		in:   `netname: ` + orgname,
 	}, {
-		want: strmap{"whois": whois},
+		want: map[string]string{"whois": whois},
 		name: "whois",
 		in:   `whois: ` + whois,
 	}, {
-		want: strmap{"whois": whois},
+		want: map[string]string{"whois": whois},
 		name: "referralserver",
 		in:   `referralserver: whois://` + whois,
 	}, {
-		want: strmap{},
+		want: map[string]string{},
 		name: "other",
 		in:   `other: value`,
 	}}
