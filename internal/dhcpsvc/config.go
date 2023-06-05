@@ -9,8 +9,9 @@ import (
 
 // Config is the configuration for the DHCP service.
 type Config struct {
-	// Interfaces stores the interface-specific configurations of DHCP server.
-	Interfaces map[string]*interfaceConfig `yaml:"interfaces"`
+	// Interfaces stores configurations of DHCP server specific for network
+	// interface.
+	Interfaces map[string]*InterfaceConfig `yaml:"interfaces"`
 
 	// LocalDomainName is the top-level domain name to use for resolving DHCP
 	// clients' hostnames.
@@ -23,20 +24,20 @@ type Config struct {
 	Enabled bool `yaml:"enabled"`
 }
 
-// interfaceConfig is the configuration of a single DHCP interface.
-type interfaceConfig struct {
+// InterfaceConfig is the configuration of a single DHCP interface.
+type InterfaceConfig struct {
 	// DHCPv4 is the configuration for handling IPv4.
-	DHCPv4 *dhcpv4Config `yaml:"dhcpv4"`
+	DHCPv4 *DHCPv4Config `yaml:"dhcpv4"`
 
 	// DHCPv6 is the configuration for handling IPv6.
-	DHCPv6 *dhcpv6Config `yaml:"dhcpv6"`
+	DHCPv6 *DHCPv6Config `yaml:"dhcpv6"`
 
 	// LeaseDuration is the TTL of a DHCP lease.
 	LeaseDuration timeutil.Duration `yaml:"lease_duration"`
 }
 
-// dhcpv4Config is the interface-specific configuration for DHCPv4.
-type dhcpv4Config struct {
+// DHCPv4Config is the interface-specific configuration for DHCPv4.
+type DHCPv4Config struct {
 	// GatewayIP is the IPv4 address of the network's gateway.  It is used as
 	// the default gateway for DHCP clients and also used in calculating the
 	// network-specific broadcast address.
@@ -53,6 +54,8 @@ type dhcpv4Config struct {
 	RangeEnd netip.Addr `yaml:"range_end"`
 
 	// Options is the list of DHCP options to send to DHCP clients.
+	//
+	// TODO(e.burkov):  Use custom marshaler.
 	Options layers.DHCPOptions `yaml:"options"`
 
 	// Enabled is the state of the DHCPv4 service, whether it is enabled or not
@@ -60,21 +63,23 @@ type dhcpv4Config struct {
 	Enabled bool `yaml:"enabled"`
 }
 
-// dhcpv6Config is the interface-specific configuration for DHCPv6.
-type dhcpv6Config struct {
+// DHCPv6Config is the interface-specific configuration for DHCPv6.
+type DHCPv6Config struct {
 	// RangeStart is the first address in the range to assign to DHCP clients.
 	RangeStart netip.Addr `yaml:"range_start"`
 
 	// Options is the list of DHCP options to send to DHCP clients.
+	//
+	// TODO(e.burkov):  Use custom marshaler.
 	Options layers.DHCPOptions `yaml:"options"`
 
 	// RASlaacOnly defines whether the DHCP clients should only use SLAAC for
 	// address assignment.
-	RASlaacOnly bool `yaml:"ra_slaac_only"`
+	RASLAACOnly bool `yaml:"ra_slaac_only"`
 
 	// RAAllowSlaac defines whether the DHCP clients may use SLAAC for address
 	// assignment.
-	RAAllowSlaac bool `yaml:"ra_allow_slaac"`
+	RAAllowSLAAC bool `yaml:"ra_allow_slaac"`
 
 	// Enabled is the state of the DHCPv6 service, whether it is enabled or not
 	// on the specific interface.

@@ -1,7 +1,9 @@
+// Package dhcpsvc contains the AdGuard Home DHCP service.
+//
+// TODO(e.burkov): Add tests.
 package dhcpsvc
 
 import (
-	"context"
 	"net"
 	"net/netip"
 	"time"
@@ -26,28 +28,27 @@ type Lease struct {
 	IsStatic bool
 }
 
-type Interface interface {
-	agh.Service
-
+type Leaser interface {
 	Leases() (leases []*Lease)
 	LeaseByIP(ip netip.Addr) (l *Lease)
 	LeaseByHostname(hostname string) (l *Lease)
+
+	AddLease(l *Lease) (err error)
+	RemoveLease(l *Lease) (err error)
+	Reset() (err error)
 }
 
-type Empty struct{}
+type Interface interface {
+	agh.ServiceWithConfig[Config]
+	Leaser
+}
+
+type Empty struct {
+	*agh.EmptyServiceWithConfig[*Config]
+}
 
 // type check
-var _ agh.Service = Empty{}
-
-// Start implements the [agh.Service] interface for Empty.
-func (e Empty) Start() (err error) {
-	return nil
-}
-
-// Shutdown implements the [agh.Service] interface for Empty.
-func (e Empty) Shutdown(_ context.Context) (err error) {
-	return nil
-}
+var _ agh.ServiceWithConfig[*Config] = Empty{}
 
 // Leases implements the [Interface] interface for Empty.
 func (e Empty) Leases() (leases []*Lease) {
@@ -61,5 +62,10 @@ func (e Empty) LeaseByIP(ip netip.Addr) (l *Lease) {
 
 // LeaseByHostname implements the [Interface] interface for Empty.
 func (e Empty) LeaseByHostname(hostname string) (l *Lease) {
+	return nil
+}
+
+// AddLease implements the [Interface] interface for Empty.
+func (e Empty) AddLease(l *Lease) (err error) {
 	return nil
 }
