@@ -131,7 +131,7 @@ func isWHOISComment(s string) (ok bool) {
 // whoisParse parses a subset of plain-text data from the WHOIS response into a
 // string map.  maxLen is the maximum field length of returned map.
 func whoisParse(data string, maxLen int) (m map[string]string) {
-	m = make(map[string]string)
+	m = map[string]string{}
 
 	var orgname string
 	lines := strings.Split(data, "\n")
@@ -221,7 +221,7 @@ func (w *Default) queryAll(ctx context.Context, target string) (data string, err
 	server := net.JoinHostPort(w.serverAddr, w.portStr)
 	var resp string
 
-	for i := 0; i != w.maxRedirects; i++ {
+	for i := 0; i < w.maxRedirects; i++ {
 		resp, err = w.query(ctx, target, server)
 		if err != nil {
 			return "", err

@@ -180,44 +180,44 @@ func initDNSServer(
 // initWHOIS initializes the WHOIS.
 func initWHOIS() {
 	const (
-		// defaultServerWHOIS is the default WHOIS server.
-		defaultServerWHOIS = "whois.arin.net"
+		// defaultServer is the default WHOIS server.
+		defaultServer = "whois.arin.net"
 
-		// queueSizeWHOIS is the size of queue of IPs for WHOIS processing.
-		queueSizeWHOIS = 255
+		// defaultQueueSize is the size of queue of IPs for WHOIS processing.
+		defaultQueueSize = 255
 
-		// timeoutWHOIS is the timeout for WHOIS requests.
-		timeoutWHOIS = 5 * time.Second
+		// defaultTimeout is the timeout for WHOIS requests.
+		defaultTimeout = 5 * time.Second
 
-		// cacheSizeWHOIS is the maximum size of the cache.  If it's zero,
+		// defaultCacheSize is the maximum size of the cache.  If it's zero,
 		// cache size is unlimited.
-		cacheSizeWHOIS = 10_000
+		defaultCacheSize = 10_000
 
-		// maxConnReadSizeWHOIS is an upper limit in bytes for reading from
+		// defaultMaxConnReadSize is an upper limit in bytes for reading from
 		// net.Conn.
-		maxConnReadSizeWHOIS = 64 * 1024
+		defaultMaxConnReadSize = 64 * 1024
 
-		// maxRedirectsWHOIS is the maximum redirects count.
-		maxRedirectsWHOIS = 5
+		// defaultMaxRedirects is the maximum redirects count.
+		defaultMaxRedirects = 5
 
-		// maxInfoLenWHOIS is the maximum length of whois.Info fields.
-		maxInfoLenWHOIS = 250
+		// defaultMaxInfoLen is the maximum length of whois.Info fields.
+		defaultMaxInfoLen = 250
 	)
 
-	Context.whoisCh = make(chan netip.Addr, queueSizeWHOIS)
+	Context.whoisCh = make(chan netip.Addr, defaultQueueSize)
 
 	var w whois.Interface
 
 	if config.Clients.Sources.WHOIS {
 		w = whois.New(&whois.Config{
 			DialContext:     customDialContext,
-			ServerAddr:      defaultServerWHOIS,
+			ServerAddr:      defaultServer,
 			Port:            defaultPortWHOIS,
-			Timeout:         timeoutWHOIS,
-			CacheSize:       cacheSizeWHOIS,
-			MaxConnReadSize: maxConnReadSizeWHOIS,
-			MaxRedirects:    maxRedirectsWHOIS,
-			MaxInfoLen:      maxInfoLenWHOIS,
+			Timeout:         defaultTimeout,
+			CacheSize:       defaultCacheSize,
+			MaxConnReadSize: defaultMaxConnReadSize,
+			MaxRedirects:    defaultMaxRedirects,
+			MaxInfoLen:      defaultMaxInfoLen,
 		})
 	} else {
 		w = whois.Empty{}
