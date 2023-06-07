@@ -1,14 +1,15 @@
-package filtering
+package schedule_test
 
 import (
 	"testing"
 	"time"
 
+	"github.com/AdguardTeam/AdGuardHome/internal/schedule"
 	"github.com/AdguardTeam/golibs/timeutil"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBlockedSchedule_Contains(t *testing.T) {
+func TestWeekly_Contains(t *testing.T) {
 	baseTime := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 	otherTime := baseTime.Add(1 * timeutil.Day)
 
@@ -16,38 +17,53 @@ func TestBlockedSchedule_Contains(t *testing.T) {
 	// is actually UTC+03:00.
 	otherTZ := time.FixedZone("Etc/GMT-3", 3*60*60)
 
-	// baseSchedule, 12:00:00 to 13:59:59.
-	baseSchedule := &BlockedSchedule{
-		Week: [7]dayRange{
+	// baseSchedule, 12:00 to 14:00.
+	baseSchedule := &schedule.Weekly{
+		Days: [7]schedule.DayRange{
 			{},
 			{},
 			{},
 			{},
 			{},
 			// baseTime is on Friday.
-			{start: 12 * time.Hour, end: 14*time.Hour - 1*time.Minute},
+			{Start: 12 * time.Hour, End: 14 * time.Hour},
 			{},
 		},
 		Location: time.UTC,
 	}
 
-	// allDaySchedule, 00:00:00 to 23:59:59.
-	allDaySchedule := &BlockedSchedule{
-		Week: [7]dayRange{
+	// allDaySchedule, 00:00 to 24:00.
+	allDaySchedule := &schedule.Weekly{
+		Days: [7]schedule.DayRange{
 			{},
 			{},
 			{},
 			{},
 			{},
 			// baseTime is on Friday.
-			{start: 0, end: 24*time.Hour - 1*time.Minute},
+			{Start: 0, End: 24 * time.Hour},
+			{},
+		},
+		Location: time.UTC,
+	}
+
+	// oneMinSchedule, 00:00 to 00:01.
+	oneMinSchedule := &schedule.Weekly{
+		Days: [7]schedule.DayRange{
+			{},
+			{},
+			{},
+			{},
+			{},
+			// baseTime is on Friday.
+			{Start: 0, End: 1 * time.Minute},
 			{},
 		},
 		Location: time.UTC,
 	}
 
 	testCases := []struct {
-		schedule *BlockedSchedule
+		schedule *schedule.Weekly
 		assert   assert.BoolAssertionFunc
 		t        time.Time
 		name     string
@@ -96,6 +112,21 @@ func TestBlockedSchedule_Contains(t *testing.T) {
 		assert:   assert.False,
 		t:        baseTime.Add(11 * time.Hour).In(otherTZ),
 		name:     "same_day_outside_other_tz",
+	}, {
+		schedule: oneMinSchedule,
+		assert:   assert.True,
+		t:        baseTime,
+		name:     "one_minute_beginning",
+	}, {
+		schedule: oneMinSchedule,
+		assert:   assert.True,
+		t:        baseTime.Add(1*time.Minute - 1),
+		name:     "one_minute_end",
+	}, {
+		schedule: oneMinSchedule,
+		assert:   assert.False,
+		t:        baseTime.Add(1 * time.Minute),
+		name:     "one_minute_past_end",
 	}}
 
 	for _, tc := range testCases {

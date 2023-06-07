@@ -15,6 +15,7 @@ import (
 	"github.com/AdguardTeam/AdGuardHome/internal/dnsforward"
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering"
 	"github.com/AdguardTeam/AdGuardHome/internal/querylog"
+	"github.com/AdguardTeam/AdGuardHome/internal/schedule"
 	"github.com/AdguardTeam/AdGuardHome/internal/stats"
 	"github.com/AdguardTeam/dnsproxy/fastip"
 	"github.com/AdguardTeam/golibs/errors"
@@ -319,9 +320,10 @@ var config = &configuration{
 			},
 
 			BlockedServices: &filtering.BlockedServices{
-				Schedule: &filtering.BlockedSchedule{
+				Schedule: &schedule.Weekly{
 					Location: time.Local,
 				},
+				IDs: []string{},
 			},
 		},
 		UpstreamTimeout: timeutil.Duration{Duration: dnsforward.DefaultTimeout},
