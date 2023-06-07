@@ -53,27 +53,27 @@ In this release, the schema version has changed from 20 to 21.
     - id_2
     'schedule':
       'time_zone': 'Local'
-      'sun': ''
+      'sun':
         'start': '0s'
-        'end': '0s'
-      'mon': ''
-        'start': '0s'
-        'end': '0s'
-      'tue': ''
-        'start': '0s'
-        'end': '0s'
-      'wed': ''
-        'start': '0s'
-        'end': '0s'
-      'thu': ''
-        'start': '0s'
-        'end': '0s'
-      'fri': ''
-        'start': '0s'
-        'end': '0s'
-      'sat': ''
-        'start': '0s'
-        'end': '0s'
+        'end': '24h'
+      'mon':
+        'start': '10m'
+        'end': '23h30m'
+      'tue':
+        'start': '20m'
+        'end': '23h'
+      'wed':
+        'start': '30m'
+        'end': '22h30m'
+      'thu':
+        'start': '40m'
+        'end': '22h'
+      'fri':
+        'start': '50m'
+        'end': '21h30m'
+      'sat':
+        'start': '1h'
+        'end': '21h'
   ```
 
   To rollback this change, replace `dns.blocked_services` object with the list

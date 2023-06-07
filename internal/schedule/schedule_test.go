@@ -22,14 +22,7 @@ func TestWeekly_Contains(t *testing.T) {
 	// baseSchedule, 12:00 to 14:00.
 	baseSchedule := &Weekly{
 		days: [7]DayRange{
-			{},
-			{},
-			{},
-			{},
-			{},
-			// baseTime is on Friday.
-			{Start: 12 * time.Hour, End: 14 * time.Hour},
-			{},
+			time.Friday: {Start: 12 * time.Hour, End: 14 * time.Hour},
 		},
 		location: time.UTC,
 	}
@@ -37,14 +30,7 @@ func TestWeekly_Contains(t *testing.T) {
 	// allDaySchedule, 00:00 to 24:00.
 	allDaySchedule := &Weekly{
 		days: [7]DayRange{
-			{},
-			{},
-			{},
-			{},
-			{},
-			// baseTime is on Friday.
-			{Start: 0, End: 24 * time.Hour},
-			{},
+			time.Friday: {Start: 0, End: 24 * time.Hour},
 		},
 		location: time.UTC,
 	}
@@ -52,14 +38,7 @@ func TestWeekly_Contains(t *testing.T) {
 	// oneMinSchedule, 00:00 to 00:01.
 	oneMinSchedule := &Weekly{
 		days: [7]DayRange{
-			{},
-			{},
-			{},
-			{},
-			{},
-			// baseTime is on Friday.
-			{Start: 0, End: 1 * time.Minute},
-			{},
+			time.Friday: {Start: 0, End: 1 * time.Minute},
 		},
 		location: time.UTC,
 	}
@@ -138,19 +117,20 @@ func TestWeekly_Contains(t *testing.T) {
 	}
 }
 
-func TestWeekly_UnmarshalYAML(t *testing.T) {
-	const brusselsSunday = `
+const brusselsSunday = `
 sun:
     start: 12h
     end: 14h
 time_zone: Europe/Brussels
 `
+
+func TestWeekly_UnmarshalYAML(t *testing.T) {
 	const sameTime = `
 sun:
     start: 9h
     end: 9h
 `
-	brussels, err := time.LoadLocation("Europe/Brussels")
+	brusseltsTZ, err := time.LoadLocation("Europe/Brussels")
 	require.NoError(t, err)
 
 	brusselsWeekly := &Weekly{
@@ -158,7 +138,7 @@ sun:
 			Start: time.Hour * 12,
 			End:   time.Hour * 14,
 		}},
-		location: brussels,
+		location: brusseltsTZ,
 	}
 
 	testCases := []struct {
@@ -197,16 +177,49 @@ sun:
 			assert.Equal(t, tc.want, w)
 		})
 	}
+}
 
-	t.Run("marshal", func(t *testing.T) {
-		var data []byte
-		data, err = yaml.Marshal(brusselsWeekly)
-		require.NoError(t, err)
+func TestWeekly_MarshalYAML(t *testing.T) {
+	brusselsTZ, err := time.LoadLocation("Europe/Brussels")
+	require.NoError(t, err)
 
-		w := &Weekly{}
-		err = yaml.Unmarshal(data, w)
-		require.NoError(t, err)
+	brusselsWeekly := &Weekly{
+		days: [7]DayRange{time.Sunday: {
+			Start: time.Hour * 12,
+			End:   time.Hour * 14,
+		}},
+		location: brusselsTZ,
+	}
 
-		assert.Equal(t, brusselsWeekly, w)
-	})
+	testCases := []struct {
+		name string
+		data []byte
+		want *Weekly
+	}{{
+		name: "empty",
+		data: []byte(""),
+		want: &Weekly{},
+	}, {
+		name: "null",
+		data: []byte("null"),
+		want: &Weekly{},
+	}, {
+		name: "brussels_sunday",
+		data: []byte(brusselsSunday),
+		want: brusselsWeekly,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var data []byte
+			data, err = yaml.Marshal(brusselsWeekly)
+			require.NoError(t, err)
+
+			w := &Weekly{}
+			err = yaml.Unmarshal(data, w)
+			require.NoError(t, err)
+
+			assert.Equal(t, brusselsWeekly, w)
+		})
+	}
 }
