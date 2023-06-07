@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/AdguardTeam/AdGuardHome/internal/aghalg"
 	"github.com/AdguardTeam/AdGuardHome/internal/aghtls"
@@ -320,10 +319,8 @@ var config = &configuration{
 			},
 
 			BlockedServices: &filtering.BlockedServices{
-				Schedule: &schedule.Weekly{
-					Location: time.Local,
-				},
-				IDs: []string{},
+				Schedule: schedule.EmptyWeekly(),
+				IDs:      []string{},
 			},
 		},
 		UpstreamTimeout: timeutil.Duration{Duration: dnsforward.DefaultTimeout},

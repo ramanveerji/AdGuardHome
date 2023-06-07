@@ -71,13 +71,12 @@ func (d *DNSFilter) ApplyBlockedServices(setts *Settings) {
 
 	bsvc := d.BlockedServices
 
-	if !bsvc.Schedule.Contains(time.Now()) {
-		return
+	if bsvc.Schedule.Contains(time.Now()) {
+		d.ApplyBlockedServicesList(setts, bsvc.IDs)
 	}
-
-	d.ApplyBlockedServicesList(setts, bsvc.IDs)
 }
 
+// ApplyBlockedServicesList appends filtering rules to the settings.
 func (d *DNSFilter) ApplyBlockedServicesList(setts *Settings, list []string) {
 	for _, name := range list {
 		rules, ok := serviceRules[name]

@@ -13,25 +13,33 @@ import (
 // Weekly is a schedule for one week.  Each day of the week has one range with
 // a beginning and an end.
 type Weekly struct {
-	// timeZone defines the location to be used to calculate the offsets of the
-	// day ranges.
-	Location *time.Location
+	// location is used to calculate the offsets of the day ranges.
+	location *time.Location
 
 	// days are the day ranges of this schedule.  The indexes of this array are
 	// the [time.Weekday] values.
-	Days [7]DayRange
+	days [7]DayRange
+}
+
+// EmptyWeekly creates empty weekly schedule with local time zone.
+func EmptyWeekly() (w *Weekly) {
+	return &Weekly{
+		location: time.Local,
+	}
 }
 
 // Contains returns true if t is within the corresponding day range of the
 // schedule in the schedule's time zone.
 func (w *Weekly) Contains(t time.Time) (ok bool) {
-	t = t.In(w.Location)
+	t = t.In(w.location)
 	wd := t.Weekday()
-	dr := w.Days[wd]
+	dr := w.days[wd]
 
 	// Calculate the offset of the day range.
+	//
+	// NOTE: Do not use [time.Truncate] since it requires UTC time zone.
 	y, m, d := t.Date()
-	day := time.Date(y, m, d, 0, 0, 0, 0, w.Location)
+	day := time.Date(y, m, d, 0, 0, 0, 0, w.location)
 	offset := t.Sub(day)
 
 	return dr.contains(offset)
@@ -52,20 +60,20 @@ func (w *Weekly) UnmarshalYAML(value *yaml.Node) (err error) {
 
 	weekly := Weekly{}
 
-	weekly.Location, err = time.LoadLocation(conf.TimeZone)
+	weekly.location, err = time.LoadLocation(conf.TimeZone)
 	if err != nil {
 		// Don't wrap the error since it's informative enough as is.
 		return err
 	}
 
 	days := []dayConfig{
-		conf.Sunday,
-		conf.Monday,
-		conf.Tuesday,
-		conf.Wednesday,
-		conf.Thursday,
-		conf.Friday,
-		conf.Saturday,
+		time.Sunday:    conf.Sunday,
+		time.Monday:    conf.Monday,
+		time.Tuesday:   conf.Tuesday,
+		time.Wednesday: conf.Wednesday,
+		time.Thursday:  conf.Thursday,
+		time.Friday:    conf.Friday,
+		time.Saturday:  conf.Saturday,
 	}
 	for i, d := range days {
 		r := DayRange{
@@ -78,7 +86,7 @@ func (w *Weekly) UnmarshalYAML(value *yaml.Node) (err error) {
 			return fmt.Errorf("weekday %s: %w", time.Weekday(i), err)
 		}
 
-		weekly.Days[i] = r
+		weekly.days[i] = r
 	}
 
 	*w = weekly
@@ -124,34 +132,34 @@ var _ yaml.Marshaler = (*Weekly)(nil)
 // MarshalYAML implements the [yaml.Marshaler] interface for *Weekly.
 func (w *Weekly) MarshalYAML() (v any, err error) {
 	return weeklyConfig{
-		TimeZone: w.Location.String(),
+		TimeZone: w.location.String(),
 		Sunday: dayConfig{
-			Start: timeutil.Duration{Duration: w.Days[time.Sunday].Start},
-			End:   timeutil.Duration{Duration: w.Days[time.Sunday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Sunday].Start},
+			End:   timeutil.Duration{Duration: w.days[time.Sunday].End},
 		},
 		Monday: dayConfig{
-			Start: timeutil.Duration{Duration: w.Days[time.Monday].Start},
-			End:   timeutil.Duration{Duration: w.Days[time.Monday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Monday].Start},
+			End:   timeutil.Duration{Duration: w.days[time.Monday].End},
 		},
 		Tuesday: dayConfig{
-			Start: timeutil.Duration{Duration: w.Days[time.Tuesday].Start},
-			End:   timeutil.Duration{Duration: w.Days[time.Tuesday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Tuesday].Start},
+			End:   timeutil.Duration{Duration: w.days[time.Tuesday].End},
 		},
 		Wednesday: dayConfig{
-			Start: timeutil.Duration{Duration: w.Days[time.Wednesday].Start},
-			End:   timeutil.Duration{Duration: w.Days[time.Wednesday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Wednesday].Start},
+			End:   timeutil.Duration{Duration: w.days[time.Wednesday].End},
 		},
 		Thursday: dayConfig{
-			Start: timeutil.Duration{Duration: w.Days[time.Thursday].Start},
-			End:   timeutil.Duration{Duration: w.Days[time.Thursday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Thursday].Start},
+			End:   timeutil.Duration{Duration: w.days[time.Thursday].End},
 		},
 		Friday: dayConfig{
-			Start: timeutil.Duration{Duration: w.Days[time.Friday].Start},
-			End:   timeutil.Duration{Duration: w.Days[time.Friday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Friday].Start},
+			End:   timeutil.Duration{Duration: w.days[time.Friday].End},
 		},
 		Saturday: dayConfig{
-			Start: timeutil.Duration{Duration: w.Days[time.Saturday].Start},
-			End:   timeutil.Duration{Duration: w.Days[time.Saturday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Saturday].Start},
+			End:   timeutil.Duration{Duration: w.days[time.Saturday].End},
 		},
 	}, nil
 }
@@ -178,13 +186,13 @@ func (r *DayRange) contains(offset time.Duration) (ok bool) {
 type weeklyConfig struct {
 	// Days of the week.
 
-	Sunday    dayConfig `yaml:"sun"`
-	Monday    dayConfig `yaml:"mon"`
-	Tuesday   dayConfig `yaml:"tue"`
-	Wednesday dayConfig `yaml:"wed"`
-	Thursday  dayConfig `yaml:"thu"`
-	Friday    dayConfig `yaml:"fri"`
-	Saturday  dayConfig `yaml:"sat"`
+	Sunday    dayConfig `yaml:"sun,omitempty"`
+	Monday    dayConfig `yaml:"mon,omitempty"`
+	Tuesday   dayConfig `yaml:"tue,omitempty"`
+	Wednesday dayConfig `yaml:"wed,omitempty"`
+	Thursday  dayConfig `yaml:"thu,omitempty"`
+	Friday    dayConfig `yaml:"fri,omitempty"`
+	Saturday  dayConfig `yaml:"sat,omitempty"`
 
 	// TimeZone is the local time zone.
 	TimeZone string `yaml:"time_zone"`

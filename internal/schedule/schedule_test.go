@@ -1,12 +1,14 @@
-package schedule_test
+package schedule
 
 import (
 	"testing"
 	"time"
 
-	"github.com/AdguardTeam/AdGuardHome/internal/schedule"
+	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/golibs/timeutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestWeekly_Contains(t *testing.T) {
@@ -18,8 +20,8 @@ func TestWeekly_Contains(t *testing.T) {
 	otherTZ := time.FixedZone("Etc/GMT-3", 3*60*60)
 
 	// baseSchedule, 12:00 to 14:00.
-	baseSchedule := &schedule.Weekly{
-		Days: [7]schedule.DayRange{
+	baseSchedule := &Weekly{
+		days: [7]DayRange{
 			{},
 			{},
 			{},
@@ -29,12 +31,12 @@ func TestWeekly_Contains(t *testing.T) {
 			{Start: 12 * time.Hour, End: 14 * time.Hour},
 			{},
 		},
-		Location: time.UTC,
+		location: time.UTC,
 	}
 
 	// allDaySchedule, 00:00 to 24:00.
-	allDaySchedule := &schedule.Weekly{
-		Days: [7]schedule.DayRange{
+	allDaySchedule := &Weekly{
+		days: [7]DayRange{
 			{},
 			{},
 			{},
@@ -44,12 +46,12 @@ func TestWeekly_Contains(t *testing.T) {
 			{Start: 0, End: 24 * time.Hour},
 			{},
 		},
-		Location: time.UTC,
+		location: time.UTC,
 	}
 
 	// oneMinSchedule, 00:00 to 00:01.
-	oneMinSchedule := &schedule.Weekly{
-		Days: [7]schedule.DayRange{
+	oneMinSchedule := &Weekly{
+		days: [7]DayRange{
 			{},
 			{},
 			{},
@@ -59,11 +61,11 @@ func TestWeekly_Contains(t *testing.T) {
 			{Start: 0, End: 1 * time.Minute},
 			{},
 		},
-		Location: time.UTC,
+		location: time.UTC,
 	}
 
 	testCases := []struct {
-		schedule *schedule.Weekly
+		schedule *Weekly
 		assert   assert.BoolAssertionFunc
 		t        time.Time
 		name     string
@@ -134,4 +136,77 @@ func TestWeekly_Contains(t *testing.T) {
 			tc.assert(t, tc.schedule.Contains(tc.t))
 		})
 	}
+}
+
+func TestWeekly_UnmarshalYAML(t *testing.T) {
+	const brusselsSunday = `
+sun:
+    start: 12h
+    end: 14h
+time_zone: Europe/Brussels
+`
+	const sameTime = `
+sun:
+    start: 9h
+    end: 9h
+`
+	brussels, err := time.LoadLocation("Europe/Brussels")
+	require.NoError(t, err)
+
+	brusselsWeekly := &Weekly{
+		days: [7]DayRange{{
+			Start: time.Hour * 12,
+			End:   time.Hour * 14,
+		}},
+		location: brussels,
+	}
+
+	testCases := []struct {
+		name       string
+		wantErrMsg string
+		data       []byte
+		want       *Weekly
+	}{{
+		name:       "empty",
+		wantErrMsg: "",
+		data:       []byte(""),
+		want:       &Weekly{},
+	}, {
+		name:       "null",
+		wantErrMsg: "",
+		data:       []byte("null"),
+		want:       &Weekly{},
+	}, {
+		name:       "brussels_sunday",
+		wantErrMsg: "",
+		data:       []byte(brusselsSunday),
+		want:       brusselsWeekly,
+	}, {
+		name:       "start_equal_end",
+		wantErrMsg: "weekday Sunday: bad day range: start 9h0m0s is greater or equal to end 9h0m0s",
+		data:       []byte(sameTime),
+		want:       &Weekly{},
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := &Weekly{}
+			err = yaml.Unmarshal(tc.data, w)
+			testutil.AssertErrorMsg(t, tc.wantErrMsg, err)
+
+			assert.Equal(t, tc.want, w)
+		})
+	}
+
+	t.Run("marshal", func(t *testing.T) {
+		var data []byte
+		data, err = yaml.Marshal(brusselsWeekly)
+		require.NoError(t, err)
+
+		w := &Weekly{}
+		err = yaml.Unmarshal(data, w)
+		require.NoError(t, err)
+
+		assert.Equal(t, brusselsWeekly, w)
+	})
 }
