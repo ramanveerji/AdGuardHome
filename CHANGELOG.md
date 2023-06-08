@@ -25,8 +25,9 @@ NOTE: Add new changes BELOW THIS COMMENT.
 
 ### Added
 
-- The ability to set custom schedule for blocked services in the configuration
-  file ([#951]).  The UI changes are coming in the upcoming releases.
+- The ability to set inactivity periods for filtering blocked services in the
+  configuration file ([#951]).  The UI changes are coming in the upcoming
+  releases.
 - The ability to edit rewrite rules via `PUT /control/rewrite/update` HTTP API
   ([#1577]).
 

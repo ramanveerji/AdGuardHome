@@ -18,7 +18,7 @@ type Weekly struct {
 
 	// days are the day ranges of this schedule.  The indexes of this array are
 	// the [time.Weekday] values.
-	days [7]DayRange
+	days [7]dayRange
 }
 
 // EmptyWeekly creates empty weekly schedule with local time zone.
@@ -76,12 +76,12 @@ func (w *Weekly) UnmarshalYAML(value *yaml.Node) (err error) {
 		time.Saturday:  conf.Saturday,
 	}
 	for i, d := range days {
-		r := DayRange{
+		r := dayRange{
 			Start: d.Start.Duration,
 			End:   d.End.Duration,
 		}
 
-		err = validate(r)
+		err = w.validate(r)
 		if err != nil {
 			return fmt.Errorf("weekday %s: %w", time.Weekday(i), err)
 		}
@@ -94,18 +94,40 @@ func (w *Weekly) UnmarshalYAML(value *yaml.Node) (err error) {
 	return nil
 }
 
+// weeklyConfig is the YAML configuration structure of Weekly.
+type weeklyConfig struct {
+	// Days of the week.
+
+	Sunday    dayConfig `yaml:"sun,omitempty"`
+	Monday    dayConfig `yaml:"mon,omitempty"`
+	Tuesday   dayConfig `yaml:"tue,omitempty"`
+	Wednesday dayConfig `yaml:"wed,omitempty"`
+	Thursday  dayConfig `yaml:"thu,omitempty"`
+	Friday    dayConfig `yaml:"fri,omitempty"`
+	Saturday  dayConfig `yaml:"sat,omitempty"`
+
+	// TimeZone is the local time zone.
+	TimeZone string `yaml:"time_zone"`
+}
+
+// dayConfig is the YAML configuration structure of dayRange.
+type dayConfig struct {
+	Start timeutil.Duration `yaml:"start"`
+	End   timeutil.Duration `yaml:"end"`
+}
+
 // maxDayRange is the maximum value for day range end.
 const maxDayRange = 24 * time.Hour
 
 // validate returns the day range validation errors, if any.
-func validate(r DayRange) (err error) {
+func (w *Weekly) validate(r dayRange) (err error) {
 	defer func() { err = errors.Annotate(err, "bad day range: %w") }()
 
 	start := r.Start.Truncate(time.Minute)
 	end := r.End.Truncate(time.Minute)
 
 	switch {
-	case r == DayRange{}:
+	case r == dayRange{}:
 		return nil
 	case start != r.Start:
 		return fmt.Errorf("start %s isn't rounded to minutes", r.Start)
@@ -164,10 +186,10 @@ func (w *Weekly) MarshalYAML() (v any, err error) {
 	}, nil
 }
 
-// DayRange represents a single interval within a day.  The interval begins at
+// dayRange represents a single interval within a day.  The interval begins at
 // Start and ends before End.  That is, it contains a time point T if Start <=
 // T < End.
-type DayRange struct {
+type dayRange struct {
 	// Start is an offset from the beginning of the day.  It must be greater
 	// than or equal to zero and less than 24h.
 	Start time.Duration
@@ -178,28 +200,6 @@ type DayRange struct {
 }
 
 // contains returns true if Start <= offset < End.
-func (r *DayRange) contains(offset time.Duration) (ok bool) {
+func (r *dayRange) contains(offset time.Duration) (ok bool) {
 	return r.Start <= offset && offset < r.End
-}
-
-// weeklyConfig is the YAML configuration structure of Weekly.
-type weeklyConfig struct {
-	// Days of the week.
-
-	Sunday    dayConfig `yaml:"sun,omitempty"`
-	Monday    dayConfig `yaml:"mon,omitempty"`
-	Tuesday   dayConfig `yaml:"tue,omitempty"`
-	Wednesday dayConfig `yaml:"wed,omitempty"`
-	Thursday  dayConfig `yaml:"thu,omitempty"`
-	Friday    dayConfig `yaml:"fri,omitempty"`
-	Saturday  dayConfig `yaml:"sat,omitempty"`
-
-	// TimeZone is the local time zone.
-	TimeZone string `yaml:"time_zone"`
-}
-
-// dayConfig is the YAML configuration structure of DayRange.
-type dayConfig struct {
-	Start timeutil.Duration `yaml:"start"`
-	End   timeutil.Duration `yaml:"end"`
 }

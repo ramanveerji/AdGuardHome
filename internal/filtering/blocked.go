@@ -71,7 +71,8 @@ func (d *DNSFilter) ApplyBlockedServices(setts *Settings) {
 
 	bsvc := d.BlockedServices
 
-	if bsvc.Schedule.Contains(time.Now()) {
+	// TODO(s.chzhen):  Use startTime from [dnsforward.dnsContext].
+	if !bsvc.Schedule.Contains(time.Now()) {
 		d.ApplyBlockedServicesList(setts, bsvc.IDs)
 	}
 }

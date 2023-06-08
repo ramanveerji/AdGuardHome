@@ -21,7 +21,7 @@ func TestWeekly_Contains(t *testing.T) {
 
 	// baseSchedule, 12:00 to 14:00.
 	baseSchedule := &Weekly{
-		days: [7]DayRange{
+		days: [7]dayRange{
 			time.Friday: {Start: 12 * time.Hour, End: 14 * time.Hour},
 		},
 		location: time.UTC,
@@ -29,7 +29,7 @@ func TestWeekly_Contains(t *testing.T) {
 
 	// allDaySchedule, 00:00 to 24:00.
 	allDaySchedule := &Weekly{
-		days: [7]DayRange{
+		days: [7]dayRange{
 			time.Friday: {Start: 0, End: 24 * time.Hour},
 		},
 		location: time.UTC,
@@ -37,7 +37,7 @@ func TestWeekly_Contains(t *testing.T) {
 
 	// oneMinSchedule, 00:00 to 00:01.
 	oneMinSchedule := &Weekly{
-		days: [7]DayRange{
+		days: [7]dayRange{
 			time.Friday: {Start: 0, End: 1 * time.Minute},
 		},
 		location: time.UTC,
@@ -134,7 +134,7 @@ sun:
 	require.NoError(t, err)
 
 	brusselsWeekly := &Weekly{
-		days: [7]DayRange{{
+		days: [7]dayRange{{
 			Start: time.Hour * 12,
 			End:   time.Hour * 14,
 		}},
@@ -184,7 +184,7 @@ func TestWeekly_MarshalYAML(t *testing.T) {
 	require.NoError(t, err)
 
 	brusselsWeekly := &Weekly{
-		days: [7]DayRange{time.Sunday: {
+		days: [7]dayRange{time.Sunday: {
 			Start: time.Hour * 12,
 			End:   time.Hour * 14,
 		}},
