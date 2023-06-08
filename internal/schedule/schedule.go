@@ -81,6 +81,11 @@ func (w *Weekly) UnmarshalYAML(value *yaml.Node) (err error) {
 			End:   d.End.Duration,
 		}
 
+		err = r.validate()
+		if err != nil {
+			return fmt.Errorf("weekday %s: %w", time.Weekday(i), err)
+		}
+
 		err = w.validate(r)
 		if err != nil {
 			return fmt.Errorf("weekday %s: %w", time.Weekday(i), err)
@@ -119,30 +124,16 @@ type dayConfig struct {
 // maxDayRange is the maximum value for day range end.
 const maxDayRange = 24 * time.Hour
 
-// validate returns the day range validation errors, if any.
+// validate returns the day range rounding errors, if any.
 func (w *Weekly) validate(r dayRange) (err error) {
-	defer func() { err = errors.Annotate(err, "bad day range: %w") }()
-
 	start := r.Start.Truncate(time.Minute)
 	end := r.End.Truncate(time.Minute)
 
 	switch {
-	case r == dayRange{}:
-		return nil
 	case start != r.Start:
 		return fmt.Errorf("start %s isn't rounded to minutes", r.Start)
 	case end != r.End:
 		return fmt.Errorf("end %s isn't rounded to minutes", r.End)
-	case r.Start < 0:
-		return fmt.Errorf("start %s is negative", r.Start)
-	case r.End < 0:
-		return fmt.Errorf("end %s is negative", r.End)
-	case r.Start >= r.End:
-		return fmt.Errorf("start %s is greater or equal to end %s", r.Start, r.End)
-	case r.Start >= maxDayRange:
-		return fmt.Errorf("start %s is greater or equal to %s", r.Start, maxDayRange)
-	case r.End > maxDayRange:
-		return fmt.Errorf("end %s is greater than %s", r.End, maxDayRange)
 	default:
 		return nil
 	}
@@ -197,6 +188,28 @@ type dayRange struct {
 	// End is an offset from the beginning of the day.  It must be greater than
 	// or equal to zero and less than or equal to 24h.
 	End time.Duration
+}
+
+// validate returns the day range validation errors, if any.
+func (r dayRange) validate() (err error) {
+	defer func() { err = errors.Annotate(err, "bad day range: %w") }()
+
+	switch {
+	case r == dayRange{}:
+		return nil
+	case r.Start < 0:
+		return fmt.Errorf("start %s is negative", r.Start)
+	case r.End < 0:
+		return fmt.Errorf("end %s is negative", r.End)
+	case r.Start >= r.End:
+		return fmt.Errorf("start %s is greater or equal to end %s", r.Start, r.End)
+	case r.Start >= maxDayRange:
+		return fmt.Errorf("start %s is greater or equal to %s", r.Start, maxDayRange)
+	case r.End > maxDayRange:
+		return fmt.Errorf("end %s is greater than %s", r.End, maxDayRange)
+	default:
+		return nil
+	}
 }
 
 // contains returns true if Start <= offset < End.
