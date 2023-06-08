@@ -81,11 +81,6 @@ func (w *Weekly) UnmarshalYAML(value *yaml.Node) (err error) {
 			End:   d.End.Duration,
 		}
 
-		err = r.validate()
-		if err != nil {
-			return fmt.Errorf("weekday %s: %w", time.Weekday(i), err)
-		}
-
 		err = w.validate(r)
 		if err != nil {
 			return fmt.Errorf("weekday %s: %w", time.Weekday(i), err)
@@ -126,6 +121,14 @@ const maxDayRange = 24 * time.Hour
 
 // validate returns the day range rounding errors, if any.
 func (w *Weekly) validate(r dayRange) (err error) {
+	defer func() { err = errors.Annotate(err, "bad day range: %w") }()
+
+	err = r.validate()
+	if err != nil {
+		// Don't wrap the error since it's informative enough as is.
+		return err
+	}
+
 	start := r.Start.Truncate(time.Minute)
 	end := r.End.Truncate(time.Minute)
 
@@ -192,8 +195,6 @@ type dayRange struct {
 
 // validate returns the day range validation errors, if any.
 func (r dayRange) validate() (err error) {
-	defer func() { err = errors.Annotate(err, "bad day range: %w") }()
-
 	switch {
 	case r == dayRange{}:
 		return nil
