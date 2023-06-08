@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // fakeConn is a mock implementation of net.Conn to simplify testing.
@@ -72,7 +73,7 @@ func TestWHOIS(t *testing.T) {
 		MaxInfoLen:      maxInfoLen,
 	})
 	info := w.Process(context.Background(), netip.MustParseAddr("1.2.3.4"))
-	assert.NotNil(t, info)
+	require.NotNil(t, info)
 
 	assert.Equal(t, "FakeOrg LLC", info.Orgname)
 	assert.Equal(t, "Imagiland", info.Country)
@@ -90,59 +91,59 @@ func TestWHOISParse(t *testing.T) {
 	testCases := []struct {
 		want map[string]string
 		name string
-		in   string
+		in   []byte
 	}{{
 		want: map[string]string{},
 		name: "empty",
-		in:   ``,
+		in:   []byte(``),
 	}, {
 		want: map[string]string{},
 		name: "comments",
-		in:   "%\n#",
+		in:   []byte("%\n#"),
 	}, {
 		want: map[string]string{},
 		name: "no_colon",
-		in:   "city",
+		in:   []byte("city"),
 	}, {
 		want: map[string]string{},
 		name: "no_value",
-		in:   "city:",
+		in:   []byte("city:"),
 	}, {
 		want: map[string]string{"city": city},
 		name: "city",
-		in:   `city: ` + city,
+		in:   []byte(`city: ` + city),
 	}, {
 		want: map[string]string{"country": country},
 		name: "country",
-		in:   `country: ` + country,
+		in:   []byte(`country: ` + country),
 	}, {
 		want: map[string]string{"orgname": orgname},
 		name: "orgname",
-		in:   `orgname: ` + orgname,
+		in:   []byte(`orgname: ` + orgname),
 	}, {
 		want: map[string]string{"orgname": orgname},
 		name: "orgname_hyphen",
-		in:   `org-name: ` + orgname,
+		in:   []byte(`org-name: ` + orgname),
 	}, {
 		want: map[string]string{"orgname": orgname},
 		name: "orgname_descr",
-		in:   `descr: ` + orgname,
+		in:   []byte(`descr: ` + orgname),
 	}, {
 		want: map[string]string{"orgname": orgname},
 		name: "orgname_netname",
-		in:   `netname: ` + orgname,
+		in:   []byte(`netname: ` + orgname),
 	}, {
 		want: map[string]string{"whois": whois},
 		name: "whois",
-		in:   `whois: ` + whois,
+		in:   []byte(`whois: ` + whois),
 	}, {
 		want: map[string]string{"whois": whois},
 		name: "referralserver",
-		in:   `referralserver: whois://` + whois,
+		in:   []byte(`referralserver: whois://` + whois),
 	}, {
 		want: map[string]string{},
 		name: "other",
-		in:   `other: value`,
+		in:   []byte(`other: value`),
 	}}
 
 	for _, tc := range testCases {

@@ -29,6 +29,7 @@ type clientJSON struct {
 	// the allowlist.
 	DisallowedRule *string `json:"disallowed_rule,omitempty"`
 
+	// WHOISInfo is the filtered WHOIS data of a client.
 	WHOISInfo      *whois.Info                 `json:"whois_info,omitempty"`
 	SafeSearchConf *filtering.SafeSearchConfig `json:"safe_search"`
 

@@ -128,7 +128,13 @@ func (cs clientSource) MarshalText() (text []byte, err error) {
 // RuntimeClient is a client information about which has been obtained using the
 // source described in the Source field.
 type RuntimeClient struct {
+	// WHOISInfo is the filtered WHOIS data of a client.
 	WHOISInfo *whois.Info
-	Host      string
-	Source    clientSource
+
+	// Host is the host name of a client.
+	Host string
+
+	// Source is the source from which the information about the client has
+	// been obtained.
+	Source clientSource
 }

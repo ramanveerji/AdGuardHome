@@ -2,6 +2,7 @@
 package whois
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -65,7 +66,7 @@ type Config struct {
 	Port uint16
 }
 
-// Default provides WHOIS functionality.
+// Default is the default WHOIS information processor.
 type Default struct {
 	// ipAddrs is the cache containing IP addresses of clients.  An active IP
 	// address is resolved once again after it expires.  If IP address couldn't
@@ -96,7 +97,7 @@ type Default struct {
 	maxInfoLen int
 }
 
-// New creates Default.
+// New returns a new default WHOIS information processor. conf must not be nil.
 func New(conf *Config) (w *Default) {
 	return &Default{
 		serverAddr:  conf.ServerAddr,
@@ -123,116 +124,117 @@ func trimValue(s string, max int) string {
 	return s[:max-3] + "..."
 }
 
-// isWHOISComment returns true if the string is empty or is a WHOIS comment.
-func isWHOISComment(s string) (ok bool) {
-	return len(s) == 0 || s[0] == '#' || s[0] == '%'
+// isWHOISComment returns true if the data is empty or is a WHOIS comment.
+func isWHOISComment(data []byte) (ok bool) {
+	return len(data) == 0 || data[0] == '#' || data[0] == '%'
 }
 
 // whoisParse parses a subset of plain-text data from the WHOIS response into a
 // string map.  maxLen is the maximum field length of returned map.
-func whoisParse(data string, maxLen int) (m map[string]string) {
-	m = map[string]string{}
+func whoisParse(data []byte, maxLen int) (info map[string]string) {
+	info = map[string]string{}
 
 	var orgname string
-	lines := strings.Split(data, "\n")
+	lines := bytes.Split(data, []byte("\n"))
 	for _, l := range lines {
 		if isWHOISComment(l) {
 			continue
 		}
 
-		kv := strings.SplitN(l, ":", 2)
-		if len(kv) != 2 {
+		before, after, found := bytes.Cut(l, []byte(":"))
+		if !found {
 			continue
 		}
 
-		k := strings.ToLower(strings.TrimSpace(kv[0]))
-		v := strings.TrimSpace(kv[1])
-		if v == "" {
+		key := strings.ToLower(string(before))
+		val := strings.TrimSpace(string(after))
+		if val == "" {
 			continue
 		}
 
-		switch k {
+		switch key {
 		case "orgname", "org-name":
-			k = "orgname"
-			v = trimValue(v, maxLen)
-			orgname = v
+			key = "orgname"
+			val = trimValue(val, maxLen)
+			orgname = val
 		case "city", "country":
-			v = trimValue(v, maxLen)
+			val = trimValue(val, maxLen)
 		case "descr", "netname":
-			k = "orgname"
-			v = stringutil.Coalesce(orgname, v)
-			orgname = v
+			key = "orgname"
+			val = stringutil.Coalesce(orgname, val)
+			orgname = val
 		case "whois":
-			k = "whois"
+			key = "whois"
 		case "referralserver":
-			k = "whois"
-			v = strings.TrimPrefix(v, "whois://")
+			key = "whois"
+			val = strings.TrimPrefix(val, "whois://")
 		default:
 			continue
 		}
 
-		m[k] = v
+		info[key] = val
 	}
 
-	return m
+	return info
 }
 
 // query sends request to a server and returns the response or error.
-func (w *Default) query(ctx context.Context, target, serverAddr string) (data string, err error) {
+func (w *Default) query(ctx context.Context, target, serverAddr string) (data []byte, err error) {
 	const arinWHOIS = "whois.arin.net"
 
 	addr, _, _ := net.SplitHostPort(serverAddr)
 	if addr == arinWHOIS {
 		// Display type flags for query.
 		//
-		// See https://www.arin.net/resources/registry/whois/rws/api/.
+		// See https://www.arin.net/resources/registry/whois/rws/api/#nicname-whois-queries.
 		target = "n + " + target
 	}
 
 	conn, err := w.dialContext(ctx, "tcp", serverAddr)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer func() { err = errors.WithDeferred(err, conn.Close()) }()
 
 	r, err := aghio.LimitReader(conn, w.maxConnReadSize)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	_ = conn.SetReadDeadline(time.Now().Add(w.timeout))
 	_, err = io.WriteString(conn, target+"\r\n")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// This use of ReadAll is now safe, because we limited the conn Reader.
-	var whoisData []byte
-	whoisData, err = io.ReadAll(r)
+	data, err = io.ReadAll(r)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(whoisData), nil
+	return data, nil
 }
 
 // queryAll queries WHOIS server and handles redirects.
-func (w *Default) queryAll(ctx context.Context, target string) (data string, err error) {
+func (w *Default) queryAll(ctx context.Context, target string) (info map[string]string, err error) {
 	server := net.JoinHostPort(w.serverAddr, w.portStr)
-	var resp string
+	var data []byte
 
 	for i := 0; i < w.maxRedirects; i++ {
-		resp, err = w.query(ctx, target, server)
+		data, err = w.query(ctx, target, server)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
-		log.Debug("whois: received response (%d bytes) from %s  IP:%s", len(resp), server, target)
+		log.Debug("whois: received response (%d bytes) from %s  IP:%s", len(data), server, target)
 
-		m := whoisParse(resp, w.maxInfoLen)
-		redir, ok := m["whois"]
+		info = whoisParse(data, w.maxInfoLen)
+		redir, ok := info["whois"]
 		if !ok {
-			return resp, nil
+			log.Debug("whois: IP:%s  response: %d bytes", target, len(data))
+
+			return info, nil
 		}
 
 		redir = strings.ToLower(redir)
@@ -247,7 +249,7 @@ func (w *Default) queryAll(ctx context.Context, target string) (data string, err
 		log.Debug("whois: redirected to %s  IP:%s", redir, target)
 	}
 
-	return "", fmt.Errorf("whois: redirect loop")
+	return nil, fmt.Errorf("whois: redirect loop")
 }
 
 // type check
@@ -259,21 +261,17 @@ func (w *Default) Process(ctx context.Context, ip netip.Addr) (wi *Info) {
 		return nil
 	}
 
-	resp, err := w.queryAll(ctx, ip.String())
+	kv, err := w.queryAll(ctx, ip.String())
 	if err != nil {
 		log.Debug("whois: error: %s  IP:%s", err, ip)
 
 		return nil
 	}
 
-	log.Debug("whois: IP:%s  response: %d bytes", ip, len(resp))
-
-	m := whoisParse(resp, w.maxInfoLen)
-
 	wi = &Info{
-		City:    m["city"],
-		Country: m["country"],
-		Orgname: m["orgname"],
+		City:    kv["city"],
+		Country: kv["country"],
+		Orgname: kv["orgname"],
 	}
 
 	// Don't return an empty struct so that the frontend doesn't get
