@@ -35,7 +35,7 @@ set -f -u
 go_version="$( "${GO:-go}" version )"
 readonly go_version
 
-go_min_version='go1.19.8'
+go_min_version='go1.19.10'
 go_version_msg="
 warning: your go version (${go_version}) is different from the recommended minimal one (${go_min_version}).
 if you have the version installed, please set the GO environment variable.
@@ -160,29 +160,7 @@ run_linter "$GO" vet ./...
 
 run_linter govulncheck ./...
 
-# Apply more lax standards to the code we haven't properly refactored yet.
-run_linter gocyclo --over 13 ./internal/querylog
-run_linter gocyclo --over 12 ./internal/dhcpd
-
-# Apply the normal standards to new or somewhat refactored code.
-run_linter gocyclo --over 10\
-	./internal/aghio/\
-	./internal/aghnet/\
-	./internal/aghos/\
-	./internal/aghtest/\
-	./internal/dnsforward/\
-	./internal/filtering/\
-	./internal/home/\
-	./internal/stats/\
-	./internal/tools/\
-	./internal/updater/\
-	./internal/next/\
-	./internal/version/\
-	./scripts/blocked-services/\
-	./scripts/vetted-filters/\
-	./scripts/translations/\
-	./main.go\
-	;
+run_linter gocyclo --over 10 .
 
 run_linter ineffassign ./...
 
