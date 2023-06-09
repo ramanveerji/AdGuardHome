@@ -4,6 +4,7 @@ package whois
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -23,7 +24,7 @@ import (
 // Interface provides WHOIS functionality.
 type Interface interface {
 	// Process makes WHOIS request and returns WHOIS information or nil.
-	Process(_ context.Context, _ netip.Addr) (_ *Info)
+	Process(ctx context.Context, ip netip.Addr) (info *Info)
 }
 
 // Empty is an empty [Interface] implementation which does nothing.
@@ -64,6 +65,9 @@ type Config struct {
 
 	// Port is the port for WHOIS requests.
 	Port uint16
+
+	// IPTTL is the Time to Live value in seconds for cached IP addresses.
+	IPTTL uint64
 }
 
 // Default is the default WHOIS information processor.
@@ -95,6 +99,9 @@ type Default struct {
 
 	// maxInfoLen is the maximum length of Info fields returned by Process.
 	maxInfoLen int
+
+	// ipTTL is the Time to Live value in seconds for cached IP addresses.
+	ipTTL uint64
 }
 
 // New returns a new default WHOIS information processor. conf must not be nil.
@@ -111,6 +118,7 @@ func New(conf *Config) (w *Default) {
 		maxRedirects:    conf.MaxRedirects,
 		portStr:         strconv.Itoa(int(conf.Port)),
 		maxInfoLen:      conf.MaxInfoLen,
+		ipTTL:           conf.IPTTL,
 	}
 }
 
@@ -261,6 +269,10 @@ func (w *Default) Process(ctx context.Context, ip netip.Addr) (wi *Info) {
 		return nil
 	}
 
+	if w.IsProcessed(ip) {
+		return nil
+	}
+
 	kv, err := w.queryAll(ctx, ip.String())
 	if err != nil {
 		log.Debug("whois: error: %s  IP:%s", err, ip)
@@ -281,6 +293,26 @@ func (w *Default) Process(ctx context.Context, ip netip.Addr) (wi *Info) {
 	}
 
 	return wi
+}
+
+// IsProcessed returns true if the IP address was already processed.
+func (w *Default) IsProcessed(ip netip.Addr) (ok bool) {
+	ipBytes := ip.AsSlice()
+	now := uint64(time.Now().Unix())
+
+	expire := w.ipAddrs.Get(ipBytes)
+	if len(expire) != 0 {
+		exp := binary.BigEndian.Uint64(expire)
+		if exp > now {
+			return true
+		}
+	}
+
+	expire = make([]byte, 8)
+	binary.BigEndian.PutUint64(expire, now+w.ipTTL)
+	_ = w.ipAddrs.Set(ipBytes, expire)
+
+	return false
 }
 
 // Info is the filtered WHOIS data for a runtime client.

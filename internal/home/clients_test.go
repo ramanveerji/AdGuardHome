@@ -10,7 +10,6 @@ import (
 	"github.com/AdguardTeam/AdGuardHome/internal/dhcpd"
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering"
 	"github.com/AdguardTeam/AdGuardHome/internal/whois"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

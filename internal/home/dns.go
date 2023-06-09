@@ -178,6 +178,8 @@ func initDNSServer(
 }
 
 // initWHOIS initializes the WHOIS.
+//
+// TODO(s.chzhen):  Consider making configurable.
 func initWHOIS() {
 	const (
 		// defaultServer is the default WHOIS server.
@@ -202,6 +204,10 @@ func initWHOIS() {
 
 		// defaultMaxInfoLen is the maximum length of whois.Info fields.
 		defaultMaxInfoLen = 250
+
+		// defaultIPTTL is the Time to Live value in seconds for cached IP
+		// addresses.
+		defaultIPTTL = 1 * 60 * 60
 	)
 
 	Context.whoisCh = make(chan netip.Addr, defaultQueueSize)
@@ -218,6 +224,7 @@ func initWHOIS() {
 			MaxConnReadSize: defaultMaxConnReadSize,
 			MaxRedirects:    defaultMaxRedirects,
 			MaxInfoLen:      defaultMaxInfoLen,
+			IPTTL:           defaultIPTTL,
 		})
 	} else {
 		w = whois.Empty{}
