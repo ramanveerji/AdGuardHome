@@ -77,8 +77,8 @@ func (w *Weekly) UnmarshalYAML(value *yaml.Node) (err error) {
 	}
 	for i, d := range days {
 		r := dayRange{
-			Start: d.Start.Duration,
-			End:   d.End.Duration,
+			start: d.Start.Duration,
+			end:   d.End.Duration,
 		}
 
 		err = w.validate(r)
@@ -129,14 +129,14 @@ func (w *Weekly) validate(r dayRange) (err error) {
 		return err
 	}
 
-	start := r.Start.Truncate(time.Minute)
-	end := r.End.Truncate(time.Minute)
+	start := r.start.Truncate(time.Minute)
+	end := r.end.Truncate(time.Minute)
 
 	switch {
-	case start != r.Start:
-		return fmt.Errorf("start %s isn't rounded to minutes", r.Start)
-	case end != r.End:
-		return fmt.Errorf("end %s isn't rounded to minutes", r.End)
+	case start != r.start:
+		return fmt.Errorf("start %s isn't rounded to minutes", r.start)
+	case end != r.end:
+		return fmt.Errorf("end %s isn't rounded to minutes", r.end)
 	default:
 		return nil
 	}
@@ -150,47 +150,47 @@ func (w *Weekly) MarshalYAML() (v any, err error) {
 	return weeklyConfig{
 		TimeZone: w.location.String(),
 		Sunday: dayConfig{
-			Start: timeutil.Duration{Duration: w.days[time.Sunday].Start},
-			End:   timeutil.Duration{Duration: w.days[time.Sunday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Sunday].start},
+			End:   timeutil.Duration{Duration: w.days[time.Sunday].end},
 		},
 		Monday: dayConfig{
-			Start: timeutil.Duration{Duration: w.days[time.Monday].Start},
-			End:   timeutil.Duration{Duration: w.days[time.Monday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Monday].start},
+			End:   timeutil.Duration{Duration: w.days[time.Monday].end},
 		},
 		Tuesday: dayConfig{
-			Start: timeutil.Duration{Duration: w.days[time.Tuesday].Start},
-			End:   timeutil.Duration{Duration: w.days[time.Tuesday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Tuesday].start},
+			End:   timeutil.Duration{Duration: w.days[time.Tuesday].end},
 		},
 		Wednesday: dayConfig{
-			Start: timeutil.Duration{Duration: w.days[time.Wednesday].Start},
-			End:   timeutil.Duration{Duration: w.days[time.Wednesday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Wednesday].start},
+			End:   timeutil.Duration{Duration: w.days[time.Wednesday].end},
 		},
 		Thursday: dayConfig{
-			Start: timeutil.Duration{Duration: w.days[time.Thursday].Start},
-			End:   timeutil.Duration{Duration: w.days[time.Thursday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Thursday].start},
+			End:   timeutil.Duration{Duration: w.days[time.Thursday].end},
 		},
 		Friday: dayConfig{
-			Start: timeutil.Duration{Duration: w.days[time.Friday].Start},
-			End:   timeutil.Duration{Duration: w.days[time.Friday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Friday].start},
+			End:   timeutil.Duration{Duration: w.days[time.Friday].end},
 		},
 		Saturday: dayConfig{
-			Start: timeutil.Duration{Duration: w.days[time.Saturday].Start},
-			End:   timeutil.Duration{Duration: w.days[time.Saturday].End},
+			Start: timeutil.Duration{Duration: w.days[time.Saturday].start},
+			End:   timeutil.Duration{Duration: w.days[time.Saturday].end},
 		},
 	}, nil
 }
 
 // dayRange represents a single interval within a day.  The interval begins at
-// Start and ends before End.  That is, it contains a time point T if Start <=
-// T < End.
+// start and ends before end.  That is, it contains a time point T if start <=
+// T < end.
 type dayRange struct {
-	// Start is an offset from the beginning of the day.  It must be greater
+	// start is an offset from the beginning of the day.  It must be greater
 	// than or equal to zero and less than 24h.
-	Start time.Duration
+	start time.Duration
 
-	// End is an offset from the beginning of the day.  It must be greater than
+	// end is an offset from the beginning of the day.  It must be greater than
 	// or equal to zero and less than or equal to 24h.
-	End time.Duration
+	end time.Duration
 }
 
 // validate returns the day range validation errors, if any.
@@ -198,22 +198,23 @@ func (r dayRange) validate() (err error) {
 	switch {
 	case r == dayRange{}:
 		return nil
-	case r.Start < 0:
-		return fmt.Errorf("start %s is negative", r.Start)
-	case r.End < 0:
-		return fmt.Errorf("end %s is negative", r.End)
-	case r.Start >= r.End:
-		return fmt.Errorf("start %s is greater or equal to end %s", r.Start, r.End)
-	case r.Start >= maxDayRange:
-		return fmt.Errorf("start %s is greater or equal to %s", r.Start, maxDayRange)
-	case r.End > maxDayRange:
-		return fmt.Errorf("end %s is greater than %s", r.End, maxDayRange)
+	case r.start < 0:
+		return fmt.Errorf("start %s is negative", r.start)
+	case r.end < 0:
+		return fmt.Errorf("end %s is negative", r.end)
+	case r.start >= r.end:
+		return fmt.Errorf("start %s is greater or equal to end %s", r.start, r.end)
+	case r.start >= maxDayRange:
+		return fmt.Errorf("start %s is greater or equal to %s", r.start, maxDayRange)
+	case r.end > maxDayRange:
+		return fmt.Errorf("end %s is greater than %s", r.end, maxDayRange)
 	default:
 		return nil
 	}
 }
 
-// contains returns true if Start <= offset < End.
+// contains returns true if start <= offset < end, where offset is the time
+// duration from the beginning of the day.
 func (r *dayRange) contains(offset time.Duration) (ok bool) {
-	return r.Start <= offset && offset < r.End
+	return r.start <= offset && offset < r.end
 }

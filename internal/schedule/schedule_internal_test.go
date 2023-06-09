@@ -22,7 +22,7 @@ func TestWeekly_Contains(t *testing.T) {
 	// baseSchedule, 12:00 to 14:00.
 	baseSchedule := &Weekly{
 		days: [7]dayRange{
-			time.Friday: {Start: 12 * time.Hour, End: 14 * time.Hour},
+			time.Friday: {start: 12 * time.Hour, end: 14 * time.Hour},
 		},
 		location: time.UTC,
 	}
@@ -30,7 +30,7 @@ func TestWeekly_Contains(t *testing.T) {
 	// allDaySchedule, 00:00 to 24:00.
 	allDaySchedule := &Weekly{
 		days: [7]dayRange{
-			time.Friday: {Start: 0, End: 24 * time.Hour},
+			time.Friday: {start: 0, end: 24 * time.Hour},
 		},
 		location: time.UTC,
 	}
@@ -38,7 +38,7 @@ func TestWeekly_Contains(t *testing.T) {
 	// oneMinSchedule, 00:00 to 00:01.
 	oneMinSchedule := &Weekly{
 		days: [7]dayRange{
-			time.Friday: {Start: 0, End: 1 * time.Minute},
+			time.Friday: {start: 0, end: 1 * time.Minute},
 		},
 		location: time.UTC,
 	}
@@ -49,6 +49,11 @@ func TestWeekly_Contains(t *testing.T) {
 		t        time.Time
 		name     string
 	}{{
+		schedule: EmptyWeekly(),
+		assert:   assert.False,
+		t:        baseTime,
+		name:     "empty",
+	}, {
 		schedule: allDaySchedule,
 		assert:   assert.True,
 		t:        baseTime,
@@ -125,18 +130,33 @@ time_zone: Europe/Brussels
 `
 
 func TestWeekly_UnmarshalYAML(t *testing.T) {
-	const sameTime = `
+	const (
+		sameTime = `
 sun:
     start: 9h
     end: 9h
 `
+		negativeStart = `
+sun:
+    start: -1h
+    end: 1h
+`
+		badTZ = `
+time_zone: "bad_timezone"
+`
+		badYAML = `
+yaml: "bad"
+yaml: "bad"
+`
+	)
+
 	brusseltsTZ, err := time.LoadLocation("Europe/Brussels")
 	require.NoError(t, err)
 
 	brusselsWeekly := &Weekly{
 		days: [7]dayRange{{
-			Start: time.Hour * 12,
-			End:   time.Hour * 14,
+			start: time.Hour * 12,
+			end:   time.Hour * 14,
 		}},
 		location: brusseltsTZ,
 	}
@@ -166,6 +186,21 @@ sun:
 		wantErrMsg: "weekday Sunday: bad day range: start 9h0m0s is greater or equal to end 9h0m0s",
 		data:       []byte(sameTime),
 		want:       &Weekly{},
+	}, {
+		name:       "start_negative",
+		wantErrMsg: "weekday Sunday: bad day range: start -1h0m0s is negative",
+		data:       []byte(negativeStart),
+		want:       &Weekly{},
+	}, {
+		name:       "bad_time_zone",
+		wantErrMsg: "unknown time zone bad_timezone",
+		data:       []byte(badTZ),
+		want:       &Weekly{},
+	}, {
+		name:       "bad_yaml",
+		wantErrMsg: "yaml: unmarshal errors:\n  line 3: mapping key \"yaml\" already defined at line 2",
+		data:       []byte(badYAML),
+		want:       &Weekly{},
 	}}
 
 	for _, tc := range testCases {
@@ -185,8 +220,8 @@ func TestWeekly_MarshalYAML(t *testing.T) {
 
 	brusselsWeekly := &Weekly{
 		days: [7]dayRange{time.Sunday: {
-			Start: time.Hour * 12,
-			End:   time.Hour * 14,
+			start: time.Hour * 12,
+			end:   time.Hour * 14,
 		}},
 		location: brusselsTZ,
 	}
@@ -220,6 +255,117 @@ func TestWeekly_MarshalYAML(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, brusselsWeekly, w)
+		})
+	}
+}
+
+func TestWeekly_Validate(t *testing.T) {
+	testCases := []struct {
+		name       string
+		in         dayRange
+		wantErrMsg string
+	}{{
+		name:       "empty",
+		wantErrMsg: "",
+		in:         dayRange{},
+	}, {
+		name:       "start_seconds",
+		wantErrMsg: "bad day range: start 1s isn't rounded to minutes",
+		in: dayRange{
+			start: time.Second,
+			end:   time.Hour,
+		},
+	}, {
+		name:       "end_seconds",
+		wantErrMsg: "bad day range: end 1s isn't rounded to minutes",
+		in: dayRange{
+			start: 0,
+			end:   time.Second,
+		},
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := &Weekly{}
+			err := w.validate(tc.in)
+
+			testutil.AssertErrorMsg(t, tc.wantErrMsg, err)
+		})
+	}
+}
+
+func TestDayRange_Validate(t *testing.T) {
+	testCases := []struct {
+		name       string
+		in         dayRange
+		wantErrMsg string
+	}{{
+		name:       "empty",
+		wantErrMsg: "",
+		in:         dayRange{},
+	}, {
+		name:       "valid",
+		wantErrMsg: "",
+		in: dayRange{
+			start: time.Hour,
+			end:   time.Hour * 2,
+		},
+	}, {
+		name:       "valid_end_max",
+		wantErrMsg: "",
+		in: dayRange{
+			start: 0,
+			end:   time.Hour * 24,
+		},
+	}, {
+		name:       "start_negative",
+		wantErrMsg: "start -1h0m0s is negative",
+		in: dayRange{
+			start: time.Hour * -1,
+			end:   time.Hour * 2,
+		},
+	}, {
+		name:       "end_negative",
+		wantErrMsg: "end -1h0m0s is negative",
+		in: dayRange{
+			start: 0,
+			end:   time.Hour * -1,
+		},
+	}, {
+		name:       "start_equal_end",
+		wantErrMsg: "start 1h0m0s is greater or equal to end 1h0m0s",
+		in: dayRange{
+			start: time.Hour,
+			end:   time.Hour,
+		},
+	}, {
+		name:       "start_greater_end",
+		wantErrMsg: "start 2h0m0s is greater or equal to end 1h0m0s",
+		in: dayRange{
+			start: time.Hour * 2,
+			end:   time.Hour,
+		},
+	}, {
+		name:       "start_equal_max",
+		wantErrMsg: "start 24h0m0s is greater or equal to 24h0m0s",
+		in: dayRange{
+			start: time.Hour * 24,
+			end:   time.Hour * 48,
+		},
+	}, {
+		name:       "end_greater_max",
+		wantErrMsg: "end 48h0m0s is greater than 24h0m0s",
+		in: dayRange{
+			start: 0,
+			end:   time.Hour * 48,
+		},
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.in.validate()
+
+			testutil.AssertErrorMsg(t, tc.wantErrMsg, err)
 		})
 	}
 }
